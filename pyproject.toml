@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neurofusion"
+version = "0.1.0"
+description = "Research scaffold for asynchronous tactile contact memory and unified action decoding"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+neurofusion = "neurofusion.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

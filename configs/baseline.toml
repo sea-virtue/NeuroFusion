@@ -1,0 +1,11 @@
+# Research starting values, not measured hardware rates or finalized model sizes.
+memory_dim = 256
+context_dim = 128
+robot_dim = 16
+frame_feature_dim = 128
+event_feature_dim = 64
+action_dim = 5
+control_hz = 50
+max_pending_messages = 4096
+# Named action schema: dx_m, dy_m, dz_m, dyaw_rad, dgripper_width_m.
+# Coordinate frame, limits, calibration and actual robot interface remain TBD.
