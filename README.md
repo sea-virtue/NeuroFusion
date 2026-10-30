@@ -35,7 +35,7 @@ src/neurofusion/
   runtime/clock.py          # 独立逻辑控制时刻
   adapters/interfaces.py    # 相机/事件/机器人边界与仅记录提案的 ShadowSink
   adapters/pending.py       # Speck、GelSight、RGB、真实机器人接口待实现
-  data/pending.py           # M02 真实 CSV 检查/回放待实现
+  data/pending.py           # H01 所需的真实输入读取等仍待实现
   training/pending.py       # 训练与评估待实现
   demo.py                   # 合成数据与 toy 组件，只验证接线
   cli.py                    # 当前仅有 demo 命令
@@ -47,4 +47,4 @@ data/README.md              # 数据、来源与排除样例约定
 
 历史硬件验证保存在同级 [speck-lab](../speck-lab/README.md)，研究规划见同级 [项目规划](../项目规划/README.md)。正式项目不复制一个新的驱动实现；未来通过适配器接入已经验证的采集路径。硬件已跑通不表示 NeuroFusion 已完成片上推理、训练或闭环。
 
-下一优先工作：按[当前任务](../项目规划/当前任务.md)完成 M02 真实事件离线检查与回放。模型层数、编码方式、门控公式、实际控制频率、执行器映射及性能随后逐项确定。
+下一优先工作：按[当前任务](../项目规划/当前任务.md)完成 H01 真实输入接入与最小追踪，随后尽早建立 H02 最小可训练主机链；逐组件单测并接回整体。验证方法见[组件实现与验证](../项目规划/组件实现与验证.md)。不等待完整GUI、REACT复现、片上推理或机器鱼平台才开始模型。模型层数、编码方式、门控公式、实际控制频率和执行器映射仍待确定。
