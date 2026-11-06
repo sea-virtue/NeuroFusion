@@ -1,0 +1,8 @@
+# Independent of baseline.toml; switch candidates without changing the runtime.
+rgb_encoder = "resnet18"         # resnet18 | dinov2_vits14
+tactile_encoder = "sparsh_dino_small"  # sparsh_dino_small | resnet18 (single RGB tactile frame baseline)
+action_head = "mlp"              # mlp | act | diffusion_unet | diffusion_transformer
+frozen_encoders = true
+pretrained = true
+horizon = 16
+inference_steps = 10

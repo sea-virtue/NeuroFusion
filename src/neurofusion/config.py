@@ -20,8 +20,8 @@ class Config:
             value = getattr(self, field.name)
             if type(value) is not int or value <= 0:
                 raise ValueError(f'{field.name} must be a positive integer')
-        if self.action_dim != 5:
-            raise ValueError('The initial named action schema has exactly five dimensions')
+        if self.action_dim not in (5, 7, 8):
+            raise ValueError('Supported dimensions: legacy 5, active split 7, packed split 8')
 
     @classmethod
     def load(cls, path: str | Path):

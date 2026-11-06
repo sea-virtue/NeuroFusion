@@ -63,3 +63,8 @@ flowchart TD
 5. H06/H07：接通同一策略的CMD→控制器→Q反馈，在最小接触任务中验动作和有效响应。
 
 片上迁移、独立反射复现和水下机器鱼不作为这条主线的前置。支持测量按实际加入的组件逐段补充；逻辑接线和软件耗时不构成物理及时反应保证。
+
+
+## 2026-11-03 可训练主机链
+
+新主链见[已实现结构](implemented-network.md)。配置`configs/pipeline.toml`；入口`python -m neurofusion.training.pipeline --steps 3`。默认attention记忆+预训练ResNet/Sparsh+MLP，支持plain/gated及ACT/两种DP。动作改为7位Franka提案（6有效+1预留零）与独立一维ROBOTIS提案；新主链总8槽位，旧5维demo仅作历史参考。22项测试、12组合及检查点检查通过；真实数据与硬件闭环待实现，辅助预测未实现。

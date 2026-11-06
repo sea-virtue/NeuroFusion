@@ -1,0 +1,37 @@
+{
+  "dinov2": {
+    "url": "https://github.com/facebookresearch/dinov2.git",
+    "commit": "7764ea0f912e53c92e82eb78a2a1631e92725fc8",
+    "path": "third_party/dinov2"
+  },
+  "sparsh": {
+    "url": "https://github.com/facebookresearch/sparsh.git",
+    "commit": "fee6a05a97330eca014b59c71ac41596fe3974a7",
+    "path": "third_party/sparsh"
+  },
+  "act": {
+    "url": "https://github.com/tonyzhaozh/act.git",
+    "commit": "742c753c0d4a5d87076c8f69e5628c79a8cc5488",
+    "path": "third_party/act"
+  },
+  "diffusion_policy": {
+    "url": "https://github.com/real-stanford/diffusion_policy.git",
+    "commit": "5ba07ac6661db573af695b419a7947ecb704690f",
+    "path": "third_party/diffusion_policy"
+  },
+  "reactive_diffusion_policy": {
+    "url": "https://github.com/xiaoxiaoxh/reactive_diffusion_policy.git",
+    "commit": "824c5e8de1fd1811106907a04b5f0186e0138c0b",
+    "path": "third_party/reactive_diffusion_policy"
+  },
+  "ImplicitRDP": {
+    "url": "https://github.com/Chen-Wendi/ImplicitRDP.git",
+    "commit": "112d6857d914c5dee4c4c172790088adc6bdc3a5",
+    "path": "third_party/ImplicitRDP"
+  },
+  "robotis_rh_p12_rn_example": {
+    "url": "https://github.com/ROBOTIS-GIT/RH-P12-RN_Example.git",
+    "commit": "33cd12b2486f1aeefdf5567aab9ca9bec59ec333",
+    "path": "third_party/robotis_rh_p12_rn_example"
+  }
+}

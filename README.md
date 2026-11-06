@@ -1,3 +1,5 @@
+> 最新夹爪实机：重启后两次受控诊断仍未通过，现使能关闭，正常运动锁保留。命令频率、线上格式及复测证据见[最新说明](docs/gripper-communication.md)。
+
 # NeuroFusion
 
 正式代码目录：`/home/diaohh23/neurofusion/neurofusion`。当前为研究框架，学习模型与真实机器人控制待实现。
@@ -48,3 +50,29 @@ data/README.md              # 数据、来源与排除样例约定
 历史硬件验证保存在同级 [speck-lab](../speck-lab/README.md)，研究规划见同级 [项目规划](../项目规划/README.md)。正式项目不复制一个新的驱动实现；未来通过适配器接入已经验证的采集路径。硬件已跑通不表示 NeuroFusion 已完成片上推理、训练或闭环。
 
 下一优先工作：按[当前任务](../项目规划/当前任务.md)完成 H01 真实输入接入与最小追踪，随后尽早建立 H02 最小可训练主机链；逐组件单测并接回整体。验证方法见[组件实现与验证](../项目规划/组件实现与验证.md)。不等待完整GUI、REACT复现、片上推理或机器鱼平台才开始模型。模型层数、编码方式、门控公式、实际控制频率和执行器映射仍待确定。
+
+## 可切换的编码器与动作头（2026-11-01）
+
+已下载六个官方源码仓库，接入 ResNet18、DINOv2-Small、Sparsh-Small，以及 MLP、ACT 条件适配、DP U-Net、DP Transformer 动作头。配置见 `configs/candidates.toml`。图像骨干默认冻结，附带官方预训练权重；动作头和投影尚未做任务训练。
+
+```bash
+python -m neurofusion.models.smoke --all --output outputs/candidates-check.json
+```
+
+参数量、权重大小、预算建议、张量训练接口及现有调度器桥接见 [候选模型说明](docs/model-candidates.md)。源码版本与恢复方法见 [third_party](third_party/README.md)。新入口不替代原合成演示；事件编码器、接触记忆学习更新和完整训练链仍待实现。
+
+
+## 2026-11-03 可训练主机链
+
+新主链见[已实现结构](docs/implemented-network.md)。配置`configs/pipeline.toml`；入口`python -m neurofusion.training.pipeline --steps 3`。默认attention记忆+预训练ResNet/Sparsh+MLP，支持plain/gated及ACT/两种DP。动作改为7位Franka提案（6有效+1预留零）与独立一维ROBOTIS提案；新主链总8槽位，旧5维demo仅作历史参考。22项测试、12组合及检查点检查通过；真实数据与硬件闭环待实现，辅助预测未实现。
+
+
+## 2026-11-04 实时双触觉接线
+
+GelNeuro/Speck与GelSight真实输入已同时接入正式编码器、记忆和影子动作输出，证据见项目规划/实验记录/2026-11-04_双触觉接入正式网络.md；新入口`python -m neurofusion.live_check --seconds 20 --output outputs/live-next`。夹爪尚未正常枚举；本次没有发送机械指令，不构成训练效果、严格时钟同步或实时控制通过。
+
+## 2026-11-04 独立原始触觉采集
+
+采集入口：`python -m neurofusion.capture gui`，也支持 `record` 与 `inspect`。事件和相机分进程读取、独立写盘，无模型推理/机械指令。保存逐事件二进制、SDK批次时间索引、相机原生MJPEG逐帧JPEG、操作条件与提示标注；支持仅事件采集。不是旧live_check的首末帧摘要。操作方法、39段建议清单、格式与边界见[触觉采集说明](docs/tactile-capture.md)。
+
+8秒真实诊断保存16个事件、1558个批次、124张3280×2464图像，文件复核通过；本机观测约17.2Hz，非25Hz保证。现有45项测试通过（含11项采集测试）。无动作真值或精确同步，不把弱标签或采集成功称为训练完成。

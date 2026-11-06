@@ -7,3 +7,31 @@ outputs/
 data/raw/
 data/processed/
 checkpoints/
+
+# Official checkouts are restored from pinned sources.lock.json.
+third_party/*/
+
+# Derived datasets, artifacts and local environments
+/data/enhance_data/
+/build/
+/dist/
+.mypy_cache/
+.ruff_cache/
+*.log
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+.env
+.env.*
+!.env.example
+*.local.json
+/.vscode/
+/.idea/
+
+# Machine-specific launchers and environment snapshot
+/scripts/open_tactile_windows.py
+/scripts/run-live-inputs.ps1
+/scripts/run-tactile-capture.ps1
+/docs/minist-cpu-verified.txt

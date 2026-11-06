@@ -9,3 +9,7 @@
 正式新数据规划放在 `data/raw/<run_id>/`、派生数据放在 `data/processed/<run_id>/`，目前尚未创建真实采集回合。大数据、模型权重与 `outputs/` 不进 Git；需要另行安排备份。
 
 合成演示结果写入 `outputs/`，明确标记 synthetic，不与真实硬件实验数据混用。
+
+## 2026-11-04 独立原始触觉采集
+
+正式录制模块已新增：`python -m neurofusion.capture gui`，默认新数据放 `data/raw/tactile/<run_id>/`。每段包括 `manifest.json`、`annotations.jsonl`、`quality.json`、原始事件/主机读取索引、可选GelSight原生图像序列。工程试录放 `outputs/capture-native-validation-20261104/`，不充当带标签训练数据。完整格式、流式读取和不覆盖约定见[触觉采集说明](../docs/tactile-capture.md)。旧文中的“尚未创建真实采集回合”仅描述此前状态。

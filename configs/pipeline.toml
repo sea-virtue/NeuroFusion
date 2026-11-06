@@ -1,0 +1,20 @@
+# New tensor pipeline; baseline.toml remains the legacy five-action toy demo.
+[fusion]
+kind = "attention" # plain | gated | attention
+memory_dim = 256
+context_dim = 128
+frame_dim = 128
+event_dim = 64
+robot_dim = 16
+executed_dim = 8
+tokens = 4
+heads = 4
+
+[models]
+rgb_encoder = "resnet18"
+tactile_encoder = "sparsh_dino_small"
+action_head = "mlp"
+frozen_encoders = true
+pretrained = true
+horizon = 16
+inference_steps = 10

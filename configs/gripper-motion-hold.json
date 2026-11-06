@@ -1,0 +1,4 @@
+{
+  "reason": "2026-11-04 reboot retest: hold target502 drifted toward open; zero-current active-goal refresh reported current-103 (~-414mA). Keep normal motion inhibited pending independent diagnosis.",
+  "latest_record": "docs/gripper-communication.md"
+}
