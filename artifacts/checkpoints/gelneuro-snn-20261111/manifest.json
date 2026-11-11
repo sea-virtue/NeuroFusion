@@ -1,0 +1,52 @@
+{
+  "date": "2026-11-11",
+  "purpose": "Checkpoint before integrating the trained SNN into NeuroFusionPolicy",
+  "integration_state": "policy.py still uses PacketEncoder CNN; trained SNN is standalone",
+  "evaluation": "Three held-out fold models; final/all-data.pt is trained on all recordings and has no independent test score",
+  "task_macro_f1": 0.8939424356672668,
+  "direction_macro_f1": 0.9193042764821802,
+  "tests": "16 selected policy/action/SNN unit tests passed on 2026-11-11 before archiving",
+  "excluded": [
+    "raw recordings",
+    "large image-backbone weights",
+    "intermediate caches"
+  ],
+  "files": [
+    {
+      "original": "outputs/gelneuro-unified-snn-20261107-fine10-native-calibrated/fold0.pt",
+      "archived": "artifacts/checkpoints/gelneuro-snn-20261111/fold0.pt",
+      "bytes": 164484,
+      "sha256": "e6a109b6a17568bdab68002b43724e909dabdfc4a1de1219019da1b045c7b11f"
+    },
+    {
+      "original": "outputs/gelneuro-unified-snn-20261107-fine10-native-calibrated/fold1.pt",
+      "archived": "artifacts/checkpoints/gelneuro-snn-20261111/fold1.pt",
+      "bytes": 164548,
+      "sha256": "011b462b48bc1e1f8ebb3b024eead62762f038c64f32e40455c9a12a7382ee1d"
+    },
+    {
+      "original": "outputs/gelneuro-unified-snn-20261107-fine10-native-calibrated/fold2.pt",
+      "archived": "artifacts/checkpoints/gelneuro-snn-20261111/fold2.pt",
+      "bytes": 164548,
+      "sha256": "f2876a8a40ea91e939f76364dac6a40ddad52f225d8bb254ccccc239975072ea"
+    },
+    {
+      "original": "outputs/gelneuro-unified-snn-20261107-fine10-native-calibrated/final/all-data.pt",
+      "archived": "artifacts/checkpoints/gelneuro-snn-20261111/final/all-data.pt",
+      "bytes": 164548,
+      "sha256": "d28753b7bb9494bb6e21bbf32d096421090f473675bddd9e5cc0a44eb65e2ee8"
+    },
+    {
+      "original": "outputs/gelneuro-unified-snn-20261107-fine10-native-calibrated/final/sdk/quantized-model.pt",
+      "archived": "artifacts/checkpoints/gelneuro-snn-20261111/final/sdk/quantized-model.pt",
+      "bytes": 204725,
+      "sha256": "1024ab87bb0175de7812871ee0450f9be2ac1c43257e9b1597ec52b87fb00ceb"
+    },
+    {
+      "original": "outputs/gelneuro-unified-snn-20261107-fine10-native-calibrated/summary.json",
+      "archived": "artifacts/checkpoints/gelneuro-snn-20261111/summary.json",
+      "bytes": 3875,
+      "sha256": "ca6bdaed5b048d77ff2da92816c6deac40864dd1a024d022e6281fa97ea93191"
+    }
+  ]
+}
