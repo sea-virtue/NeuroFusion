@@ -5,6 +5,7 @@ from torch import nn
 from .candidates import CandidateConfig
 from .encoders import ImageBackbone
 from .events import PacketEncoder, voxelize
+from .snn_adapter import SNNPacketEncoder
 from .fusion import ContactFusion, FusionConfig
 from .split_actions import SplitActionHead
 
@@ -30,18 +31,30 @@ class TensorState:
     revision: int = 0
     frame_ns: int | None = None
     event_ns: int | None = None
+    event_state: object = None
+    event_end_us: int | None = None
     def detach(self):
-        return replace(self, **{key:getattr(self,key).detach() for key in ('memory','context','robot','executed')})
+        def detach(value):
+            if isinstance(value, torch.Tensor): return value.detach()
+            if isinstance(value, tuple): return tuple(detach(item) for item in value)
+            return value
+        return replace(self, **{key:detach(getattr(self,key)) for key in ('memory','context','robot','executed','event_state')})
 
 
 class NeuroFusionPolicy(nn.Module):
-    def __init__(self, fusion=FusionConfig(), candidate=CandidateConfig()):
+    def __init__(self, fusion=FusionConfig(), candidate=CandidateConfig(), *, load_event_checkpoint=True):
         super().__init__()
         self.fusion_config, self.candidate = fusion, candidate
         kwargs = dict(pretrained=candidate.pretrained, frozen=candidate.frozen_encoders)
         self.rgb = ImageBackbone(candidate.rgb_encoder, fusion.context_dim, **kwargs)
         self.tactile = ImageBackbone(candidate.tactile_encoder, fusion.frame_dim, **kwargs)
-        self.events = PacketEncoder(fusion.event_dim)
+        if candidate.event_encoder == 'snn':
+            if fusion.event_dim != 64:
+                raise ValueError('Trained SNN provides 64 features')
+            self.events = SNNPacketEncoder(candidate.event_checkpoint, bin_us=candidate.event_bin_us,
+                frozen=candidate.frozen_event_encoder, load_checkpoint=load_event_checkpoint)
+        else:
+            self.events = PacketEncoder(fusion.event_dim)
         self.fusion = ContactFusion(fusion)
         self.actions = SplitActionHead(candidate, memory_dim=fusion.memory_dim,
                                       context_dim=fusion.context_dim, robot_dim=fusion.robot_dim)
@@ -93,7 +106,13 @@ class NeuroFusionPolicy(nn.Module):
                     raise ValueError('Event packet needs an explicit device-time window')
                 if len(value) != state.memory.shape[0]:
                     raise ValueError('One raw event packet per batch member required')
-                feature = self.events(voxelize(value,observation.start_us,observation.end_us,device=memory.device))
+                if self.candidate.event_encoder == 'snn':
+                    if state.event_end_us is not None and observation.start_us != state.event_end_us:
+                        raise ValueError('SNN windows must be contiguous, including empty windows; reset per episode')
+                    feature, event_state = self.events(value, observation.start_us, observation.end_us, state.event_state)
+                    current = replace(current, event_state=event_state, event_end_us=observation.end_us)
+                else:
+                    feature = self.events(voxelize(value,observation.start_us,observation.end_us,device=memory.device))
             memory = self.fusion(memory,current.context,current.robot,current.executed,timing,kind,feature)
             # A late source must not replace the timestamp of fresher evidence.
             key = 'frame_ns' if kind == 'frame' else 'event_ns'

@@ -76,7 +76,7 @@ def restore_checkpoint(path, device='cpu'):
     data = torch.load(path,map_location='cpu',weights_only=True)
     candidate = CandidateConfig(**data['candidate'])
     # The checkpoint includes frozen backbones; no second download/load needed.
-    model = NeuroFusionPolicy(FusionConfig(**data['fusion']),replace(candidate,pretrained=False))
+    model = NeuroFusionPolicy(FusionConfig(**data['fusion']),replace(candidate,pretrained=False),load_event_checkpoint=False)
     model.load_state_dict(data['model'],strict=True)
     model.candidate = candidate
     return model.to(device)
@@ -106,7 +106,14 @@ def run(fusion, candidate, *, steps=3, device='cpu', data=None, validation=None,
             for name,module in [('rgb_projection',model.rgb.projection),('tactile_projection',model.tactile.projection),
                                 ('event_encoder',model.events),('fusion',model.fusion),('action_head',model.actions)]:
                 first_gradients[name] = sum(p.grad.abs().sum().item() for p in module.parameters() if p.grad is not None)
-            assert all(value > 0 for value in first_gradients.values()), first_gradients
+            observed = {item.kind for item in observations}
+            needed = {'fusion', 'action_head'}
+            if 'rgb' in observed: needed.add('rgb_projection')
+            if 'frame' in observed: needed.add('tactile_projection')
+            if 'event' in observed and any(p.requires_grad for p in model.events.parameters()):
+                needed.add('event_encoder')
+            required = {name: value for name, value in first_gradients.items() if name in needed}
+            assert all(value > 0 for value in required.values()), first_gradients
             if candidate.frozen_encoders:
                 assert all(p.grad is None for p in model.rgb.backbone.parameters())
                 assert all(p.grad is None for p in model.tactile.backbone.parameters())
@@ -141,7 +148,7 @@ def run(fusion, candidate, *, steps=3, device='cpu', data=None, validation=None,
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config',default='configs/pipeline.toml')
+    parser.add_argument('--config',default='configs/pipeline-snn.toml')
     parser.add_argument('--fusion',choices=['plain','gated','attention'])
     parser.add_argument('--head',choices=['mlp','act','diffusion_unet','diffusion_transformer'])
     parser.add_argument('--steps',type=int,default=3)

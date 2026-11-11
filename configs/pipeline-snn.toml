@@ -1,0 +1,24 @@
+# Trained SNN main path. CNN remains available in pipeline.toml for comparison.
+[fusion]
+kind = "attention"
+memory_dim = 256
+context_dim = 128
+frame_dim = 128
+event_dim = 64
+robot_dim = 16
+executed_dim = 8
+tokens = 4
+heads = 4
+
+[models]
+rgb_encoder = "resnet18"
+tactile_encoder = "sparsh_dino_small"
+action_head = "mlp"
+frozen_encoders = true
+pretrained = true
+horizon = 16
+inference_steps = 10
+event_encoder = "snn"
+event_checkpoint = "artifacts/checkpoints/gelneuro-snn-20261111/final/all-data.pt"
+frozen_event_encoder = true
+event_bin_us = 1000

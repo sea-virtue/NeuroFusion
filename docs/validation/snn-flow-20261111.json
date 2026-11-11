@@ -1,0 +1,250 @@
+{
+  "date": "2026-11-11",
+  "software_tests_passed": 52,
+  "event_encoder": "trained_snn",
+  "synthetic_training": {
+    "synthetic": true,
+    "losses": [
+      0.32552966475486755,
+      0.2836781442165375,
+      0.26132932305336
+    ],
+    "first_gradient_sums": {
+      "rgb_projection": 12.721614927053452,
+      "tactile_projection": 10.586361523717642,
+      "event_encoder": 0,
+      "fusion": 46.67700308072381,
+      "action_head": 95.25995011627674
+    },
+    "checkpoint_roundtrip": true,
+    "models": {
+      "rgb_encoder": "resnet18",
+      "tactile_encoder": "sparsh_dino_small",
+      "action_head": "mlp",
+      "frozen_encoders": true,
+      "pretrained": true,
+      "horizon": 16,
+      "inference_steps": 10,
+      "event_encoder": "snn",
+      "event_checkpoint": "artifacts/checkpoints/gelneuro-snn-20261111/final/all-data.pt",
+      "frozen_event_encoder": true,
+      "event_bin_us": 1000
+    }
+  },
+  "synthetic_matrix": [
+    {
+      "fusion": "plain",
+      "head": "mlp",
+      "synthetic": true,
+      "loss": 0.3064574599266052,
+      "gradients": {
+        "rgb_projection": 8.409226581454277,
+        "tactile_projection": 7.288269337379916e-06,
+        "event_encoder": 0,
+        "fusion": 12.601510151715019,
+        "action_head": 27.840069070458412
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "plain",
+      "head": "act",
+      "synthetic": true,
+      "loss": 84.15966796875,
+      "gradients": {
+        "rgb_projection": 20.159417629241943,
+        "tactile_projection": 9.76209666347927e-06,
+        "event_encoder": 0,
+        "fusion": 30.3015619367513,
+        "action_head": 315200.7981183231
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "plain",
+      "head": "diffusion_unet",
+      "synthetic": true,
+      "loss": 1.213012456893921,
+      "gradients": {
+        "rgb_projection": 112.19604915380478,
+        "tactile_projection": 5.130275613396407e-05,
+        "event_encoder": 0,
+        "fusion": 148.7949213334004,
+        "action_head": 2542.4239516705275
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "plain",
+      "head": "diffusion_transformer",
+      "synthetic": true,
+      "loss": 1.1616289615631104,
+      "gradients": {
+        "rgb_projection": 1.6285847388207912,
+        "tactile_projection": 6.638866083541473e-07,
+        "event_encoder": 0,
+        "fusion": 2.241566816088704,
+        "action_head": 7655.0750769505285
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "gated",
+      "head": "mlp",
+      "synthetic": true,
+      "loss": 0.30875056982040405,
+      "gradients": {
+        "rgb_projection": 7.6603955663740635,
+        "tactile_projection": 0.009715955893625505,
+        "event_encoder": 0,
+        "fusion": 9.408092924175435,
+        "action_head": 24.471304178237915
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "gated",
+      "head": "act",
+      "synthetic": true,
+      "loss": 85.83062744140625,
+      "gradients": {
+        "rgb_projection": 33.05936215817928,
+        "tactile_projection": 0.03962465398944914,
+        "event_encoder": 0,
+        "fusion": 38.05916113202693,
+        "action_head": 328398.34004984796
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "gated",
+      "head": "diffusion_unet",
+      "synthetic": true,
+      "loss": 1.3575770854949951,
+      "gradients": {
+        "rgb_projection": 120.93573325872421,
+        "tactile_projection": 0.10895818553399295,
+        "event_encoder": 0,
+        "fusion": 128.0946331297746,
+        "action_head": 2563.139900783077
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "gated",
+      "head": "diffusion_transformer",
+      "synthetic": true,
+      "loss": 1.2589973211288452,
+      "gradients": {
+        "rgb_projection": 1.8728588093072176,
+        "tactile_projection": 0.002453947574394988,
+        "event_encoder": 0,
+        "fusion": 2.0562391254079557,
+        "action_head": 7569.359939848193
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "attention",
+      "head": "mlp",
+      "synthetic": true,
+      "loss": 0.32552966475486755,
+      "gradients": {
+        "rgb_projection": 12.721614927053452,
+        "tactile_projection": 10.586361523717642,
+        "event_encoder": 0,
+        "fusion": 46.67700308072381,
+        "action_head": 95.25995011627674
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "attention",
+      "head": "act",
+      "synthetic": true,
+      "loss": 86.6888427734375,
+      "gradients": {
+        "rgb_projection": 14.494269996881485,
+        "tactile_projection": 11.407733835279942,
+        "event_encoder": 0,
+        "fusion": 49.64292204333469,
+        "action_head": 329393.17875275016
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "attention",
+      "head": "diffusion_unet",
+      "synthetic": true,
+      "loss": 1.269557237625122,
+      "gradients": {
+        "rgb_projection": 124.93466234207153,
+        "tactile_projection": 86.9852203130722,
+        "event_encoder": 0,
+        "fusion": 397.8331908285618,
+        "action_head": 3590.378427360207
+      },
+      "proposals": 4
+    },
+    {
+      "fusion": "attention",
+      "head": "diffusion_transformer",
+      "synthetic": true,
+      "loss": 1.1982371807098389,
+      "gradients": {
+        "rgb_projection": 2.6438159570097923,
+        "tactile_projection": 1.660232987254858,
+        "event_encoder": 0,
+        "fusion": 8.064796740014572,
+        "action_head": 7428.033144352361
+      },
+      "proposals": 4
+    }
+  ],
+  "recorded_forward": {
+    "recording": "data/raw/tactile/20261104T082310Z_slide_5f021487",
+    "real_gelsight": true,
+    "real_events": true,
+    "events": 59,
+    "snn_steps": 64,
+    "snn_trace_norm": 28.697290420532227,
+    "memory_changed": true,
+    "event_vs_empty_memory_difference": 0.15471777319908142,
+    "event_vs_empty_action_difference": 0.007682293653488159,
+    "proposals": [
+      {
+        "time_ns": 22117754650890,
+        "revision": 3,
+        "franka": [
+          0.023536570370197296,
+          0.04197614639997482,
+          -0.020582057535648346,
+          -0.1624269038438797,
+          -0.017236322164535522,
+          -0.06260044127702713,
+          0.0
+        ],
+        "robotis": [
+          0.037515394389629364
+        ],
+        "normalized": true
+      }
+    ],
+    "robot_commands_sent": 0,
+    "missing_inputs": [
+      "scene_RGB",
+      "robot_feedback",
+      "expert_actions"
+    ],
+    "clock_basis": "recorded host receipt proxy; no precision sync or live latency claim",
+    "scope": "Real dual-tactile offline forward; untrained fusion/action head, not task validation"
+  },
+  "not_validated": [
+    "real action training",
+    "closed-loop robot execution",
+    "precision synchronization",
+    "real-time deadlines",
+    "chip execution"
+  ],
+  "robot_commands_sent": 0
+}

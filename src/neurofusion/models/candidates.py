@@ -14,8 +14,16 @@ class CandidateConfig:
     pretrained: bool = True
     horizon: int = 16
     inference_steps: int = 10
+    event_encoder: str = 'cnn'
+    event_checkpoint: str | None = None
+    frozen_event_encoder: bool = True
+    event_bin_us: int = 1000
 
     def __post_init__(self):
+        if self.event_encoder not in ('cnn', 'snn'):
+            raise ValueError('event_encoder must be cnn or snn')
+        if type(self.frozen_event_encoder) is not bool or type(self.event_bin_us) is not int or self.event_bin_us <= 0:
+            raise ValueError('Event freeze flag/time step invalid')
         if self.rgb_encoder not in ('resnet18', 'dinov2_vits14'):
             raise ValueError('RGB candidate must be resnet18 or dinov2_vits14')
         if self.tactile_encoder not in ('resnet18', 'sparsh_dino_small'):
