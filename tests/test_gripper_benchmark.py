@@ -1,5 +1,11 @@
 import unittest
-from neurofusion.gripper_benchmark import decode_block,validate_sample,trial_metrics
+import contextlib
+import io
+from pathlib import Path
+import tempfile
+from types import SimpleNamespace
+from unittest.mock import patch
+from neurofusion.gripper_benchmark import decode_block,validate_sample,trial_metrics,Bench,run
 
 
 class GripperBenchmarkTests(unittest.TestCase):
@@ -31,6 +37,30 @@ class GripperBenchmarkTests(unittest.TestCase):
         self.assertEqual(result['first_within_2_counts_ms'],40.)
         self.assertEqual(result['steady_mean_error_raw'],0)
         self.assertNotIn('speed_mm_s',result)
+
+    def test_position_profile_rejects_zero_current_instead_of_testing_a_hold(self):
+        device = SimpleNamespace(limits={'min_raw':0,'max_raw':1150},table=None)
+        bench = Bench(device,io.StringIO(),503)
+        with self.assertRaisesRegex(ValueError,'positive ceiling'):
+            bench.profile(0,4)
+
+    def test_hold_startup_uses_nonzero_preload_without_changed_goal_or_zero_ramp(self):
+        import sys
+        import types
+        from test_robotis import FakePort,FakePacket
+        packet = FakePacket()
+        sdk = types.SimpleNamespace(PortHandler=FakePort,PacketHandler=lambda protocol:packet)
+        with tempfile.TemporaryDirectory() as root,patch.dict(sys.modules,{'dynamixel_sdk':sdk}),patch(
+                'neurofusion.gripper_benchmark.Bench.monitor',return_value=[]) as monitor,patch(
+                'neurofusion.gripper_benchmark.time.sleep'),contextlib.redirect_stdout(io.StringIO()):
+            report = run(Path(root)/'hold','hold',operator_ready=True)
+        self.assertTrue(report['passed'])
+        self.assertTrue(report['cleanup']['torque_off_confirmed'])
+        profile = next(value for address,value in packet.log if address == 596 and isinstance(value,bytes))
+        self.assertEqual(int.from_bytes(profile[:4],'little'),503)
+        self.assertEqual(int.from_bytes(profile[8:],'little'),25)
+        self.assertNotIn((604,0),packet.log)
+        monitor.assert_called_once_with(503,.6,'enable-hold')
 
 
 if __name__ == '__main__': unittest.main()

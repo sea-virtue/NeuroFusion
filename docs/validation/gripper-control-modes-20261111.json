@@ -1,0 +1,27 @@
+{
+  "verified_at_utc": "2026-11-11T09:21:45.530676+00:00",
+  "environment": "WSL Ubuntu-20.04 / conda minist / Python 3.12.16",
+  "command": "OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 python -m unittest discover -s tests",
+  "passed": true,
+  "workspace_tests": 87,
+  "gripper_tests": 31,
+  "tests_in_committed_project": 71,
+  "additional_uncommitted_slip_compatibility_tests": 16,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "hardware_motion_performed": false,
+  "device_mode_changed": false,
+  "incident_interlock_preserved": true,
+  "limitations": [
+    "Mocked DYNAMIXEL transport; no new mechanical validation",
+    "No calibrated contact force, MIT controller or 500 Hz claim",
+    "Local slip-controller changes are preserved but excluded from this commit"
+  ],
+  "reference_sha256": {
+    "1_robotis_rh.py": "eaa216b6b2c70e24bfe07bdb75d2fda81bf4ec34ac4daebe0825ff6e2910aa11",
+    "1_robotis_rh_current_debug.py": "337718b41ac82eeaaa6bf272997edae327029e225302bd4294e0948f60bbe09a",
+    "01_gripper_position_debug_v4.py": "b8c61b5d975718f10c3b89c1c78777892558a77db39acbf68e2a5b74106a7749",
+    "01_rhp12_streaming_benchmark.py": "87fe4ea2d8b833194886155ac718bd538a3d118f79796312f11ca627be1b2292"
+  }
+}

@@ -9,21 +9,12 @@ import json
 from pathlib import Path
 import statistics
 import time
-from .adapters.robotis import RobotisGripper,GripperConfig,motion_inhibit_reason
+from .adapters.robotis import (RobotisGripper,GripperConfig,motion_inhibit_reason,
+                              decode_rn_state)
 
 
 def decode_block(data):
-    if len(data) != 30:
-        raise ValueError('Expected exact RN register block 596..625')
-    data = bytes(data)
-    def integer(offset,size,signed=False):
-        return int.from_bytes(data[offset:offset+size],'little',signed=signed)
-    return dict(goal_raw=integer(0,4,True),profile_velocity_raw=integer(4,4,True),
-        goal_current_raw=integer(8,2,True),acceleration_raw=integer(10,4),
-        moving=bool(integer(14,1)),position_raw=integer(15,4,True),
-        velocity_raw=integer(19,4,True),current_raw=integer(25,2,True),
-        current_a=integer(25,2,True)*.00402,voltage_v=integer(27,2)*.1,
-        temperature_c=integer(29,1))
+    return decode_rn_state(data)
 
 
 def validate_sample(sample, *, target, low, high, current_raw):
@@ -89,13 +80,19 @@ class Bench:
         self.emit('sample',phase=phase,**sample)
         return sample
 
-    def profile(self,current_raw,velocity_raw):
+    def profile(self,current_raw,velocity_raw,position=None):
         d,t = self.device,self.device.table
-        if not 0 <= current_raw <= 49 or not 1 <= velocity_raw <= 8:
-            raise ValueError('Diagnostic cap is 197mA and .912rpm')
+        if not 1 <= current_raw <= 49 or not 1 <= velocity_raw <= 8:
+            raise ValueError('Diagnostic requires a positive ceiling, at most 197mA and .912rpm')
+        if position is None:
+            position = d._read(t.goal_position,4,True)
+        if not self.low <= position <= self.high:
+            raise ValueError('Profile target outside diagnostic range')
+        d._write(t.profile_acceleration,4,1)
+        d._write_position_profile(position,current_raw,velocity_raw)
         for address,size,value in ((t.goal_current,2,current_raw),
-                (t.profile_velocity,4,velocity_raw),(t.profile_acceleration,4,1)):
-            d._write(address,size,value)
+                (t.profile_velocity,4,velocity_raw),(t.profile_acceleration,4,1),
+                (t.goal_position,4,position)):
             if d._read(address,size) != value:
                 raise RuntimeError('Profile write/readback mismatch')
         self.current_raw,self.velocity_raw = current_raw,velocity_raw
@@ -170,26 +167,16 @@ def run(output,stage,operator_ready=False):
             saved = {address:(size,d._read(address,size)) for address,size in
                      ((t.goal_current,2),(t.profile_velocity,4),(t.profile_acceleration,4))}
             try:
-                # RN diagnostic: preloading a goal before torque-on did not
-                # produce a reliable hold. Refresh a CHANGED goal after enabling,
-                # with zero current first, before ramping any drive current.
-                report['initialization']='zero current; changed goal refreshed after torque-on; bounded current ramp'
-                bench.profile(0,4)
-                d._write(t.goal_position,4,initial.position_raw+1)
+                # Mode 5 needs a nonzero current ceiling to actively hold position.
+                # Preload measured position/velocity/ceiling before torque-on, as
+                # in the supplied RN reference. Do not force a changed target or
+                # diagnose zero-current drift as a failed position controller.
+                report['initialization']='measured position with positive current ceiling and velocity; preload before torque-on'
+                bench.profile(25,4,position=initial.position_raw)
                 bench.sample('pre-enable')
                 enabled_attempted = True
                 bench.emit('torque_enable_request')
                 d._write(t.torque,1,1)
-                d._write(t.goal_position,4,initial.position_raw)
-                bench.emit('active_goal_refresh',target_raw=initial.position_raw)
-                bench.monitor(initial.position_raw,.03,'zero-current-active-goal')
-                for current in (1,5,10,25):
-                    d._write(t.goal_current,2,current)
-                    bench.current_raw=current
-                    if d._read(t.goal_current,2) != current:
-                        raise RuntimeError('Current ramp readback mismatch')
-                    bench.emit('current_ramp',current_raw=current)
-                    bench.monitor(initial.position_raw,.04,f'ramp-{current}')
                 bench.monitor(initial.position_raw,.6,'enable-hold')
                 report['hold_passed'] = True
                 print('Enable/hold passed; goal and measured position stayed inside bounds',flush=True)

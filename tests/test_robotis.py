@@ -5,7 +5,7 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 from neurofusion.adapters.robotis import (RobotisGripper,GripperConfig,TABLES,
-    GripperSample,GripperReceipt,confirmed_execution_observation)
+    GripperSample,GripperReceipt,GripperCurrentReceipt,confirmed_execution_observation)
 
 
 class FakePort:
@@ -20,6 +20,9 @@ class FakePacket:
         self.model = model
         self.log = []
         self.fail_goal = False
+        self.fail_zero_current = False
+        self.short_read = False
+        self.reads = []
         t = TABLES[model]
         self.values = {6:25,11:5,t.min_position:0,t.max_position:1150,
             t.current_limit:820,t.velocity_limit:100,t.acceleration_limit:255,
@@ -31,6 +34,25 @@ class FakePacket:
     def ping(self, port, device): return self.model,0,0
     def getTxRxResult(self, value): return f'transport {value}'
     def getRxPacketError(self, value): return f'device {value}'
+    def readTxRx(self, port, device, address, size):
+        self.reads.append((address,size))
+        data = bytearray(size)
+        # Legacy RN block has reserved bytes between velocity and current.
+        for reg,width in ((596,4),(600,4),(604,2),(606,4),(610,1),(611,4),
+                          (615,4),(621,2),(623,2),(625,1)):
+            if address <= reg and reg+width <= address+size:
+                value = self.values[reg] & ((1 << (width*8))-1)
+                data[reg-address:reg-address+width] = value.to_bytes(width,'little')
+        return list(data[:-1] if self.short_read else data),0,0
+    def writeTxRx(self, port, device, address, size, data):
+        self.log.append((address,bytes(data)))
+        if self.fail_goal and address == TABLES[self.model].goal_position:
+            return -1001,0
+        if address != 596 or size != 10:
+            raise AssertionError('Unexpected legacy RN position profile block')
+        for reg,offset,width in ((596,0,4),(600,4,4),(604,8,2)):
+            self.values[reg] = int.from_bytes(bytes(data[offset:offset+width]),'little')
+        return 0,0
     def __getattr__(self, name):
         if name.startswith('read'):
             return lambda port,device,address:(self.values[address],0,0)
@@ -38,6 +60,8 @@ class FakePacket:
             def write(port, device, address, value):
                 self.log.append((address,value))
                 if self.fail_goal and address == TABLES[self.model].goal_position:
+                    return -1001,0
+                if self.fail_zero_current and address == TABLES[self.model].goal_current and value == 0:
                     return -1001,0
                 self.values[address] = value
                 return 0,0
@@ -77,12 +101,178 @@ class RobotisTests(unittest.TestCase):
         t = TABLES[35073]
         with mock,device:
             device.arm()
-            self.assertEqual(packet.log[3:5],[(t.goal_position,503),(t.torque,1)])
+            payload = (503).to_bytes(4,'little')+(5).to_bytes(4,'little')+(49).to_bytes(2,'little')
+            self.assertEqual(packet.log[:3],[(t.profile_acceleration,1),
+                                           (t.goal_position,payload),(t.torque,1)])
             self.assertGreater(packet.values[t.profile_velocity],0)
             self.assertLessEqual(packet.values[t.goal_current]*t.current_unit_a,.2)
         self.assertEqual(packet.values[t.torque],0)
         self.assertEqual(packet.values[t.goal_current],820)
         self.assertEqual(packet.values[t.profile_velocity],0)
+
+    def test_rna_preload_uses_its_own_addresses_not_the_legacy_contiguous_block(self):
+        mock,device,packet = self.session(FakePacket(35074),allow_motion=True)
+        t = TABLES[35074]
+        with mock,device:
+            device.arm()
+            self.assertEqual([address for address,value in packet.log],
+                [t.profile_acceleration,t.goal_current,t.profile_velocity,t.goal_position,t.torque])
+            self.assertTrue(all(isinstance(value,int) for _,value in packet.log))
+
+    def test_block_feedback_handles_signed_values_gaps_and_short_reads(self):
+        mock,device,packet = self.session()
+        t = TABLES[35073]
+        packet.values[t.present_velocity] = (1 << 32)-3
+        packet.values[t.present_current] = (1 << 16)-2
+        with mock,device:
+            sample = device.read()
+            self.assertEqual(sample.velocity_raw,-3)
+            self.assertAlmostEqual(sample.current_a,-.00804)
+            self.assertEqual(packet.reads,[(596,30)])
+            packet.short_read = True
+            with self.assertRaisesRegex(RuntimeError,'Short register read'):
+                device.read()
+
+    def test_current_arm_zeros_old_target_without_changing_mode_or_position_profile(self):
+        for model in TABLES:
+            packet = FakePacket(model)
+            packet.values[11] = 0
+            mock,device,packet = self.session(packet,allow_motion=True,control_mode='current')
+            t = TABLES[model]
+            with mock,device:
+                sample = device.arm()
+                self.assertEqual(sample.operating_mode,0)
+                self.assertEqual(packet.log,[(t.goal_current,0),(t.torque,1)])
+            self.assertEqual(packet.values[t.torque],0)
+            self.assertEqual(packet.values[t.goal_current],0)
+
+    def test_mode_mismatch_and_position_current_confusion_never_send_targets(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        mock,device,packet = self.session(packet,allow_motion=True)
+        with mock,device:
+            with self.assertRaises(RuntimeError): device.arm()
+        self.assertEqual(packet.log,[])
+        mock,device,packet = self.session(allow_motion=True)
+        with mock,device:
+            device.arm()
+            count = len(packet.log)
+            with self.assertRaises(RuntimeError): device.command_current(.05)
+            self.assertEqual(len(packet.log),count)
+
+    def test_signed_current_is_bounded_quantized_and_not_a_position_receipt(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        mock,device,packet = self.session(packet,allow_motion=True,control_mode='current')
+        with mock,device:
+            device.arm()
+            for target in (.05,-.05,0.):
+                receipt = device.command_current(target)
+                self.assertIsInstance(receipt,GripperCurrentReceipt)
+                self.assertLessEqual(abs(receipt.target_current_a),abs(target))
+                self.assertAlmostEqual(receipt.target_current_a,receipt.target_raw*.00402)
+                self.assertEqual(packet.values[604],receipt.target_raw & 0xFFFF)
+            count = len(packet.log)
+            for target in (float('nan'),float('inf'),.201,-.201,.001):
+                with self.assertRaises(ValueError): device.command_current(target)
+            with self.assertRaises(RuntimeError): device.command(self.proposal(.44))
+            with self.assertRaises(RuntimeError): device.wait(receipt)
+            self.assertEqual(len(packet.log),count)
+
+    def test_current_hardware_limit_and_measured_session_range_are_enforced(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        packet.values[30] = 10
+        mock,device,packet = self.session(packet,allow_motion=True,control_mode='current')
+        with mock,device:
+            device.arm()
+            count = len(packet.log)
+            with self.assertRaises(ValueError): device.command_current(.1)
+            packet.values[611] = 550
+            with self.assertRaises(RuntimeError): device.command_current(.02)
+            self.assertEqual(len(packet.log),count)
+
+    def test_current_trial_sets_one_goal_then_disables_on_callback_failure(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        mock,device,packet = self.session(packet,allow_motion=True,control_mode='current')
+        with mock,device:
+            device.arm()
+            def failed(sample):
+                raise RuntimeError('feedback consumer failed')
+            with self.assertRaisesRegex(RuntimeError,'feedback consumer failed'):
+                device.hold_current(.05,.01,failed)
+            self.assertEqual(packet.values[562],0)
+            self.assertEqual(packet.values[604],0)
+            self.assertEqual(sum(1 for address,value in packet.log if address == 604 and value != 0),1)
+
+    def test_current_trial_without_arm_never_disables_another_controller(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        packet.values[562] = 1
+        mock,device,packet = self.session(packet,allow_motion=True,control_mode='current')
+        with mock,device:
+            with self.assertRaisesRegex(RuntimeError,'not been armed'):
+                device.hold_current(.05,.01)
+        self.assertEqual(packet.log,[])
+
+    def test_excess_current_immediately_after_enable_disables_both_modes(self):
+        for mode in ('position','current'):
+            packet = FakePacket()
+            packet.values[11] = 5 if mode == 'position' else 0
+            mock,device,packet = self.session(packet,allow_motion=True,control_mode=mode)
+            with self.assertRaisesRegex(RuntimeError,'current exceeds'):
+                with mock,device:
+                    initial = device.read()
+                    after = replace(initial,torque_enabled=True,current_a=.5)
+                    with patch.object(device,'read',side_effect=[initial,after]):
+                        device.arm()
+            self.assertEqual(packet.values[562],0)
+
+    def test_even_a_short_current_trial_reads_feedback_before_shutting_down(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        mock,device,packet = self.session(packet,allow_motion=True,control_mode='current')
+        with mock,device:
+            device.arm()
+            samples = []
+            receipt,last = device.hold_current(.05,1e-12,samples.append)
+            self.assertEqual(len(samples),1)
+            self.assertEqual(last,samples[-1])
+            self.assertEqual(packet.values[562],0)
+
+    def test_zero_current_write_failure_still_attempts_torque_off(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        mock,device,packet = self.session(packet,allow_motion=True,control_mode='current')
+        with self.assertRaises(RuntimeError):
+            with mock,device:
+                device.arm()
+                packet.fail_zero_current = True
+                device.disarm()
+        self.assertEqual(packet.values[562],0)
+
+    def test_mode_change_is_explicit_eeprom_write_requires_torque_off_and_interlock(self):
+        mock,device,packet = self.session(allow_motion=True,control_mode='current')
+        with mock,device:
+            packet.values[562] = 1
+            with self.assertRaises(RuntimeError): device.set_mode('current')
+            self.assertEqual(packet.log,[])
+            packet.values[562] = 0
+            with patch('neurofusion.adapters.robotis.motion_inhibit_reason',return_value='incident'):
+                with self.assertRaises(RuntimeError): device.set_mode('current')
+            self.assertEqual(packet.log,[])
+            device.set_mode('current')
+            self.assertEqual(packet.log,[(11,0)])
+            device.arm()
+
+    def test_current_feedback_cannot_be_reported_as_executed_position(self):
+        sample = GripperSample(30,503,503/1150,0,0.,24.3,42,False,True,0,503,
+                               operating_mode=0)
+        with self.assertRaises(ValueError):
+            confirmed_execution_observation(GripperReceipt(10,20,503,503/1150),sample,None)
+        with self.assertRaises(ValueError):
+            confirmed_execution_observation(GripperCurrentReceipt(10,20,10,.0402),sample,None)
 
     def test_normalized_stale_nonfinite_and_large_goals_never_reach_write(self):
         mock,device,packet = self.session(allow_motion=True)
