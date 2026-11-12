@@ -78,6 +78,9 @@ class RobotisTests(unittest.TestCase):
 
     def session(self, packet=None, **kwargs):
         packet = packet or FakePacket()
+        # Existing low-current commissioning cases remain explicit; the production
+        # default using the hardware maximum is tested separately below.
+        kwargs.setdefault('use_hardware_current_limit',False)
         sdk = types.SimpleNamespace(PortHandler=FakePort,PacketHandler=lambda protocol:packet)
         return patch.dict(sys.modules,{'dynamixel_sdk':sdk}),RobotisGripper(GripperConfig(**kwargs)),packet
 
@@ -118,6 +121,34 @@ class RobotisTests(unittest.TestCase):
             self.assertEqual([address for address,value in packet.log],
                 [t.profile_acceleration,t.goal_current,t.profile_velocity,t.goal_position,t.torque])
             self.assertTrue(all(isinstance(value,int) for _,value in packet.log))
+
+    def test_position_uses_read_device_limit_and_matching_feedback_threshold(self):
+        for model,limit in ((35073,820),(35073,500),(35074,820)):
+            packet = FakePacket(model)
+            t = TABLES[model]
+            packet.values[t.current_limit] = limit
+            mock,device,packet = self.session(packet,allow_motion=True,
+                use_hardware_current_limit=True)
+            with mock,device:
+                self.assertAlmostEqual(device.config.current_cap_a,limit*t.current_unit_a)
+                device.arm()
+                self.assertEqual(packet.values[t.goal_current],limit)
+                sample = replace(device.read(),current_a=device.config.current_cap_a-.01)
+                device._check_motion_sample(sample)
+                with self.assertRaisesRegex(RuntimeError,'current exceeds'):
+                    device._check_motion_sample(replace(sample,current_a=device.config.current_cap_a+.04))
+                self.assertFalse(any(address == t.current_limit for address,value in packet.log))
+
+    def test_current_mode_does_not_turn_maximum_position_ceiling_into_current_target(self):
+        packet = FakePacket()
+        packet.values[11] = 0
+        mock,device,packet = self.session(packet,allow_motion=True,control_mode='current',
+            use_hardware_current_limit=True)
+        with mock,device:
+            self.assertEqual(device.config.current_cap_a,.2)
+            device.arm()
+            self.assertEqual(packet.values[604],0)
+            with self.assertRaises(ValueError): device.command_current(3.)
 
     def test_block_feedback_handles_signed_values_gaps_and_short_reads(self):
         mock,device,packet = self.session()

@@ -62,7 +62,7 @@ def trial_metrics(samples, start_raw, target_raw, sent_ns, ack_ns):
 class Bench:
     def __init__(self,device,trace,origin):
         self.device,self.trace,self.origin = device,trace,origin
-        self.current_raw,self.velocity_raw = 25,4
+        self.current_raw,self.velocity_raw = device.limits['current_raw'],4
         self.low = max(device.limits['min_raw'],origin-4)
         self.high = min(device.limits['max_raw'],origin+25)
 
@@ -82,8 +82,8 @@ class Bench:
 
     def profile(self,current_raw,velocity_raw,position=None):
         d,t = self.device,self.device.table
-        if not 1 <= current_raw <= 49 or not 1 <= velocity_raw <= 8:
-            raise ValueError('Diagnostic requires a positive ceiling, at most 197mA and .912rpm')
+        if not 1 <= current_raw <= d.limits['current_raw'] or not 1 <= velocity_raw <= 8:
+            raise ValueError('Diagnostic requires a positive ceiling within hardware current limit and at most .912rpm')
         if position is None:
             position = d._read(t.goal_position,4,True)
         if not self.low <= position <= self.high:
@@ -172,7 +172,7 @@ def run(output,stage,operator_ready=False):
                 # in the supplied RN reference. Do not force a changed target or
                 # diagnose zero-current drift as a failed position controller.
                 report['initialization']='measured position with positive current ceiling and velocity; preload before torque-on'
-                bench.profile(25,4,position=initial.position_raw)
+                bench.profile(bench.current_raw,4,position=initial.position_raw)
                 bench.sample('pre-enable')
                 enabled_attempted = True
                 bench.emit('torque_enable_request')
@@ -181,7 +181,8 @@ def run(output,stage,operator_ready=False):
                 report['hold_passed'] = True
                 print('Enable/hold passed; goal and measured position stayed inside bounds',flush=True)
                 if stage != 'hold':
-                    profiles = [(25,4,1)] if stage == 'small' else [(25,4,2),(49,4,3),(49,8,3)]
+                    profiles = ([(bench.current_raw,4,1)] if stage == 'small' else
+                                [(bench.current_raw,4,3),(bench.current_raw,8,3)])
                     for current,velocity,repeats in profiles:
                         bench.profile(current,velocity)
                         for repeat in range(repeats):

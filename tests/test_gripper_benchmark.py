@@ -39,7 +39,7 @@ class GripperBenchmarkTests(unittest.TestCase):
         self.assertNotIn('speed_mm_s',result)
 
     def test_position_profile_rejects_zero_current_instead_of_testing_a_hold(self):
-        device = SimpleNamespace(limits={'min_raw':0,'max_raw':1150},table=None)
+        device = SimpleNamespace(limits={'min_raw':0,'max_raw':1150,'current_raw':820},table=None)
         bench = Bench(device,io.StringIO(),503)
         with self.assertRaisesRegex(ValueError,'positive ceiling'):
             bench.profile(0,4)
@@ -58,7 +58,7 @@ class GripperBenchmarkTests(unittest.TestCase):
         self.assertTrue(report['cleanup']['torque_off_confirmed'])
         profile = next(value for address,value in packet.log if address == 596 and isinstance(value,bytes))
         self.assertEqual(int.from_bytes(profile[:4],'little'),503)
-        self.assertEqual(int.from_bytes(profile[8:],'little'),25)
+        self.assertEqual(int.from_bytes(profile[8:],'little'),820)
         self.assertNotIn((604,0),packet.log)
         monitor.assert_called_once_with(503,.6,'enable-hold')
 

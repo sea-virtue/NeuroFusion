@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-12",
+  "passed": true,
+  "workspace_tests": 89,
+  "tests_in_committed_project": 73,
+  "additional_uncommitted_slip_compatibility_tests": 16,
+  "command": "OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 python -m unittest discover -s tests",
+  "position_current_limit_source": "existing device Current Limit; no EEPROM writes",
+  "last_known_RN_limit_raw": 820,
+  "last_known_RN_limit_A": 3.2964,
+  "current_mode_direct_target_cap_changed": false,
+  "incident_interlock_preserved": true,
+  "hardware_connected": false,
+  "hardware_register_write_performed": false,
+  "hardware_motion_performed": false
+}

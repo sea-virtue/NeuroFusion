@@ -4,7 +4,7 @@ Mode 5 accepts absolute closure and a current ceiling. Mode 0 accepts signed
 motor current, not closure, calibrated contact force, or MIT impedance commands.
 Read-only by default. Motion is an explicit bounded commissioning session.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 import math
 import json
@@ -88,6 +88,9 @@ class GripperConfig:
     tolerance_raw: int = 3
     timeout_s: float = 4.
     control_mode: str = 'position'
+    # Mode 5: resolve the ceiling from the device's existing Current Limit.
+    # Mode 0 retains the explicit, bounded signed-current commissioning cap.
+    use_hardware_current_limit: bool = True
 
     def __post_init__(self):
         if self.control_mode not in OPERATING_MODES:
@@ -100,8 +103,11 @@ class GripperConfig:
         for key in ('current_cap_a','velocity_rpm','timeout_s'):
             if not math.isfinite(getattr(self,key)) or getattr(self,key) <= 0:
                 raise ValueError(f'{key} must be finite and positive')
-        if self.current_cap_a > .3 or self.velocity_rpm > 1.:
-            raise ValueError('Commissioning adapter supports at most .3A and 1rpm')
+        if type(self.use_hardware_current_limit) is not bool:
+            raise ValueError('use_hardware_current_limit must be boolean')
+        if (self.current_cap_a > .3 and (self.control_mode != 'position' or
+                not self.use_hardware_current_limit)) or self.velocity_rpm > 1.:
+            raise ValueError('Explicit commissioning cap supports at most .3A and 1rpm; position mode may use the device current limit')
 
 
 @dataclass(frozen=True)
@@ -194,6 +200,13 @@ class RobotisGripper:
             }
             if self.limits['max_raw'] <= self.limits['min_raw']:
                 raise RuntimeError('Invalid hardware position limits')
+            if self.config.control_mode == 'position' and self.config.use_hardware_current_limit:
+                # Keep existing consumers of config.current_cap_a consistent with
+                # the ceiling actually written; never change EEPROM Current Limit.
+                cap = self.limits['current_raw']*t.current_unit_a
+                if cap <= 0:
+                    raise RuntimeError('Invalid hardware current limit')
+                self.config = replace(self.config,current_cap_a=cap)
             return self
         except BaseException:
             self._port.closePort()
