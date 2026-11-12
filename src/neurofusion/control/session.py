@@ -12,7 +12,7 @@ class Episode:
         self.path.mkdir(parents=True,exist_ok=False)
         self.manifest = {'format':'neurofusion.slip_teacher','version':1,
                          'status':'recording','synthetic':synthetic,'outcome':'unreviewed',
-                         'control_mode':'snn_onset_wall_timer','distance_measured':False,
+                         'control_mode':'snn_immediate_reclose' if config.slide_seconds == 0 else 'snn_onset_wall_timer','distance_measured':False,
                          'action_units':'absolute_closure_fraction_0_to_1',
                          'config':asdict(config),'tactile_recording':str(Path(tactile_recording).resolve()) if tactile_recording else None,
                          'host_monotonic_anchor_ns':time.monotonic_ns(),

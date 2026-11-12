@@ -9,6 +9,11 @@ from neurofusion.gripper_benchmark import decode_block,validate_sample,trial_met
 
 
 class GripperBenchmarkTests(unittest.TestCase):
+    def setUp(self):
+        ceiling = patch('neurofusion.adapters.robotis.load_position_ceiling',return_value=None)
+        ceiling.start()
+        self.addCleanup(ceiling.stop)
+
     def test_block_decodes_signed_current_velocity_and_units(self):
         data = bytearray(30)
         for offset,size,value in ((0,4,20),(4,4,4),(8,2,25),(10,4,1),(15,4,10),

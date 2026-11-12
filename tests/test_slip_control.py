@@ -20,8 +20,13 @@ BASE = 1_000_000_000
 
 
 class SlipTests(unittest.TestCase):
+    def setUp(self):
+        ceiling = patch('neurofusion.adapters.robotis.load_position_ceiling',return_value=None)
+        ceiling.start()
+        self.addCleanup(ceiling.stop)
+
     def config(self, **kwargs):
-        return replace(SlipConfig(grip_closure=.44,grip_settle_seconds=0.),**kwargs)
+        return replace(SlipConfig(grip_closure=.44,grip_settle_seconds=0.,slide_seconds=.5,confirm_seconds=.03),**kwargs)
 
     def prediction(self, t, task='quiet', direction='down', seq=None):
         return SlipPrediction(t if seq is None else seq,BASE+t*1_000_000,BASE+t*1_000_000,
@@ -95,10 +100,86 @@ class SlipTests(unittest.TestCase):
         self.assertEqual(ctl.reason,'control_tick_gap')
 
     def test_invalid_config_and_probabilities(self):
-        for changes in ({'slide_seconds':0},{'close_delay_seconds':.5},{'grip_closure':float('nan')},
+        for changes in ({'slide_seconds':-1},{'close_delay_seconds':.5},{'grip_closure':float('nan')},
                         {'expected_direction':'image_down'},{'max_open_delta':.6}):
             with self.assertRaises(ValueError): self.config(**changes)
         with self.assertRaises(ValueError): replace(self.prediction(0),task_confidence=float('nan'))
+
+    def test_immediate_catch_commands_grip_on_first_slide_in_same_tick(self):
+        cfg=self.config(slide_seconds=0,confirm_seconds=0,confidence=.6)
+        ctl=SlipController(cfg)
+        self.tick(ctl,0)
+        p=replace(self.prediction(20,'slide','up'),task_confidence=.61,direction_confidence=.1)
+        row=self.tick(ctl,20,closure=.438,prediction=p)
+        self.assertEqual(row['phase'],'BRAKING')
+        self.assertIsNone(row['fault_reason'])
+        self.assertEqual(row['command']['closure'],cfg.grip_closure)
+        self.assertEqual(row['onset_available_ns'],p.available_ns)
+
+    def test_immediate_catch_rejects_stale_and_low_confidence_as_detection(self):
+        cfg=self.config(slide_seconds=0,confirm_seconds=0)
+        ctl=SlipController(cfg)
+        self.tick(ctl,0)
+        p=replace(self.prediction(20,'slide'),task_confidence=.79)
+        self.assertEqual(self.tick(ctl,20,prediction=p)['phase'],'OPENING')
+        self.assertIsNone(ctl.onset_ns)
+        self.tick(ctl,200,prediction=p)
+        self.assertIsNone(ctl.onset_ns)
+        self.assertEqual(ctl.phase,'BRAKING')
+
+    def test_single_count_opening_waits_for_measured_arrival_and_interval(self):
+        step=1/1150
+        cfg=self.config(slide_seconds=0,confirm_seconds=0,grip_closure=562/1150,
+                        open_step=step,open_step_interval=.1,max_open_delta=2*step,
+                        arrival_tolerance=.25*step)
+        ctl=SlipController(cfg)
+        first=self.tick(ctl,0,closure=cfg.grip_closure)
+        self.assertAlmostEqual(first['command']['closure'],561/1150)
+        # Waited long enough, but no measured movement: must not skip a count.
+        for t in range(20,141,20):
+            row=self.tick(ctl,t,closure=cfg.grip_closure)
+            self.assertAlmostEqual(row['command']['closure'],561/1150)
+        second=self.tick(ctl,160,closure=561/1150)
+        self.assertAlmostEqual(second['command']['closure'],560/1150)
+        for t in range(180,321,20):
+            row=self.tick(ctl,t,closure=560/1150)
+            self.assertAlmostEqual(row['command']['closure'],560/1150)
+        catch=self.tick(ctl,340,'slide','up',closure=560/1150)
+        self.assertEqual(catch['phase'],'BRAKING')
+        self.assertAlmostEqual(catch['command']['closure'],562/1150)
+
+    def test_immediate_config_and_grip_ceiling(self):
+        self.assertEqual(SlipConfig(grip_closure=.44).slide_seconds,0.)
+        for kwargs in (dict(confirm_seconds=.01),dict(close_delay_seconds=.01),dict(open_step=.1),dict(open_step_interval=0)):
+            with self.assertRaises(ValueError):
+                replace(SlipConfig(grip_closure=.44),**kwargs)
+        ctl=SlipController(self.config(slide_seconds=0,confirm_seconds=0))
+        result=self.tick(ctl,0,closure=.45)
+        self.assertLessEqual(result['command']['closure'],.44)
+
+    def test_opening_starts_at_calibrated_grip_when_initial_pose_is_more_open(self):
+        span=1150
+        cfg=self.config(slide_seconds=0,confirm_seconds=0,grip_closure=562/span,
+                        open_step=1/span,max_open_delta=1/span,max_tracking_delta=2/span,
+                        arrival_tolerance=.5/span)
+        ctl=SlipController(cfg)
+        initial=self.tick(ctl,0,closure=560/span)
+        self.assertEqual(initial['phase'],'GRIPPING')
+        self.assertEqual(round(initial['command']['closure']*span),562)
+        opening=self.tick(ctl,20,closure=562/span)
+        self.assertEqual(opening['phase'],'OPENING')
+        self.assertEqual(round(opening['command']['closure']*span),561)
+        for t in range(40,221,20):
+            row=self.tick(ctl,t,closure=561/span)
+            self.assertGreaterEqual(round(row['command']['closure']*span),561)
+
+    def test_one_count_command_accepts_explicit_feedback_jitter_tolerance(self):
+        cfg=self.config(slide_seconds=0,confirm_seconds=0,grip_closure=562/1150,
+                        open_step=1/1150,max_open_delta=1/1150,max_tracking_delta=16/1150,
+                        arrival_tolerance=3/1150)
+        row=self.tick(SlipController(cfg),0,closure=563/1150)
+        self.assertEqual(row['phase'],'OPENING')
+        self.assertEqual(round(row['command']['closure']*1150),561)
 
     def test_compensation_advances_braking(self):
         ctl = SlipController(self.config(close_delay_seconds=.1,confirm_seconds=0))

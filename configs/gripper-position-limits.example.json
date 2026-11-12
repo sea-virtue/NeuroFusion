@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "model_number": 35073,
+  "device_id": 1,
+  "port": "/dev/ttyUSB0",
+  "min_raw": 0,
+  "hardware_max_raw": 1150,
+  "max_position_raw": 575,
+  "command_margin_raw": 13,
+  "grip_reference_raw": 562,
+  "source": "Reference for the 2026-11-12 ruler setup only; verify hardware identity and recalibrate before using on another setup."
+}

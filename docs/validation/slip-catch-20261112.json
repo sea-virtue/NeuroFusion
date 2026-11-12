@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-12",
+  "baseline_commit": "e646666",
+  "scope": "Focused software regression, previous 50 Hz user execution timing, and 100 Hz read-only integration. No loaded motion at the new rate; no claim of verified physical retention.",
+  "software": {
+    "tests_run": 100,
+    "successful": true,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "patterns": {
+      "test_slip_control.py": 22,
+      "test_slip_launch.py": 5,
+      "test_live_slip.py": 9,
+      "test_speck_watermark.py": 3,
+      "test_snn_empty_advance.py": 3,
+      "test_gripper*.py": 22,
+      "test_robotis.py": 25,
+      "test_capture.py": 11
+    },
+    "not_run": [
+      {
+        "test": "test_robotis.RobotisTests.test_current_feedback_cannot_be_reported_as_executed_position",
+        "reason": "torchvision is not installed in the minimal live environment"
+      },
+      {
+        "test": "test_robotis.RobotisTests.test_measured_feedback_preserves_arm_fields_and_requires_fresh_arrival",
+        "reason": "torchvision is not installed in the minimal live environment"
+      }
+    ],
+    "scope": "Focused software regression; no devices opened, no motor commands. Full model/training suite not run."
+  },
+  "launcher_checks": {
+    "bash_syntax": true,
+    "dry_run": true,
+    "devices_opened": false
+  },
+  "previous_user_execution": {
+    "source": "outputs/slip-catch-BdXpQ0QJ/timing-audit.json",
+    "control_hz": 50,
+    "window_ms": 20,
+    "timing": {
+      "trigger": "first_slide_task_at_or_above_0.6",
+      "trigger_prediction": {
+        "sequence": 110,
+        "available_ns": 21326523787004,
+        "captured_ns": 21326521755137,
+        "task": "slide",
+        "direction": "up",
+        "task_confidence": 0.7187827825546265,
+        "direction_confidence": 0.9949912428855896,
+        "model_id": "sha256:d28753b7bb9494bb6e21bbf32d096421090f473675bddd9e5cc0a44eb65e2ee8"
+      },
+      "classification_to_goal_write_ms": 7.928196,
+      "watermark_receipt_to_classification_ms": 2.031867,
+      "decision_to_position_561_or_higher_ms": 259.684037,
+      "decision_to_finished_ms": 299.813934,
+      "explicit_slide_wait_seconds": 0,
+      "confirmation_wait_seconds": 0,
+      "physics_onset_time_known": false,
+      "physical_object_retention_verified": false,
+      "scope": "Log timing only; no claim that FINISHED proves the ruler was retained or physical slip onset was observed"
+    }
+  },
+  "new_rate_shadow": {
+    "source": "outputs/tactile-live-probe-20261112/fast-launch-shadow/validation.json",
+    "window_ms": 1,
+    "clock_hz": 100,
+    "poll_ms": 0.25,
+    "metrics": {
+      "requested_control_hz": 100.0,
+      "observed_control_hz": 99.99034557922722,
+      "cycle_ms": {
+        "median": 10.003529499999999,
+        "p95": 10.044044,
+        "maximum": 11.018637
+      },
+      "effective_inference_hz": 99.46905852595758,
+      "commands_sent": 0,
+      "forced_controller_stop": false,
+      "forced_publisher_stop": false,
+      "control_settings_match_user_last_run": true,
+      "termination_reason": "grip_timeout"
+    }
+  },
+  "raw_outputs_in_git": false,
+  "limitations": [
+    "No complete dual-camera BC episode in these controller diagnostics.",
+    "The physical onset of slip and object retention are not verified.",
+    "SDK hardware clock measurement is limited to 100 Hz; 1 ms windows do not imply 1000 Hz live publication.",
+    "Minimal runtime lacks torchvision; full model and training tests were not run."
+  ]
+}

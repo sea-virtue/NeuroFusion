@@ -1,9 +1,21 @@
 """Read-only hardware inputs; Speck configuration sequence follows speck-lab."""
 import time
+import math
 import numpy as np
 
 
 class SpeckSource:
+    def __init__(self, *, clock_hz=None, clock_lag_us=10_000):
+        if clock_hz is not None and (not math.isfinite(clock_hz) or not 0 < clock_hz <= 100):
+            raise ValueError('Device clock measurement rate must be in (0,100] Hz')
+        if type(clock_lag_us) is not int or clock_lag_us < 0:
+            raise ValueError('Nonnegative integer device clock lag required')
+        self.clock_hz,self.clock_lag_us = clock_hz,clock_lag_us
+        self.clock_graph = self.power_monitor = None
+        self.clock_owned = False
+        self.actual_clock_hz = None
+        self.watermark_us = self.watermark_host_ns = self.last_clock_us = None
+
     def __enter__(self):
         import samna
         self.samna = samna
@@ -28,14 +40,38 @@ class SpeckSource:
             self.watch.start()
             self.sink.get_events()
             model.apply_configuration(config)
+            if self.clock_hz is not None:
+                # Power measurements carry the same resettable FPGA timestamp
+                # as DVS events. They advance even when the DVS is silent.
+                self.power_monitor = self.device.get_power_monitor()
+                self.clock_graph = samna.graph.EventFilterGraph()
+                _,self.clock_sink = self.clock_graph.sequential([
+                    self.power_monitor.get_source_node(),
+                    samna.BasicSinkNode_unifirm_modules_events_measurement()])
+                self.clock_graph.start()
+                if not self.power_monitor.is_auto_power_measurement_active():
+                    self.clock_owned = True
+                    self.actual_clock_hz = self.power_monitor.start_auto_power_measurement(self.clock_hz)
             return self
         except BaseException:
             self.__exit__(None,None,None)
             raise
 
     def read(self):
+        measurements = self.clock_sink.get_events() if self.clock_graph is not None else []
+        # Drain DVS after reading the clock channel, allowing a short guarded
+        # delay for independent graph/USB queues. Late DVS events are rejected
+        # by the window buffer rather than silently reassigned to future bins.
         events = self.sink.get_events()
         received_ns = time.monotonic_ns()
+        if measurements:
+            latest = max(int(e.timestamp) for e in measurements)
+            if self.last_clock_us is not None and latest < self.last_clock_us-50_000:
+                raise RuntimeError('Speck hardware clock reset or wrapped during capture')
+            if self.last_clock_us is None or latest > self.last_clock_us:
+                self.last_clock_us = latest
+                self.watermark_us = max(0,latest-self.clock_lag_us)
+                self.watermark_host_ns = received_ns
         values = np.asarray([[e.x,e.y,e.timestamp,int(e.p)] for e in events],dtype=np.int64).reshape(-1,4)
         return received_ns,values
 
@@ -44,11 +80,17 @@ class SpeckSource:
             if self.original is not None:
                 self.device.get_model().apply_configuration(self.original)
         finally:
-            try: self.graph.stop()
-            finally:
+            try:
                 try:
-                    if self.watch is not None: self.watch.stop()
-                finally: self.samna.device.close_device(self.device)
+                    if self.clock_owned: self.power_monitor.stop_auto_power_measurement()
+                finally:
+                    if self.clock_graph is not None: self.clock_graph.stop()
+            finally:
+                try: self.graph.stop()
+                finally:
+                    try:
+                        if self.watch is not None: self.watch.stop()
+                    finally: self.samna.device.close_device(self.device)
 
 
 class GelSightSource:

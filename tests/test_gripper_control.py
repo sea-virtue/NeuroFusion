@@ -8,12 +8,17 @@ import types
 import unittest
 from unittest.mock import patch
 
-from neurofusion.adapters.robotis import RobotisGripper
+from neurofusion.adapters.robotis import RobotisGripper,PositionBoundary
 from neurofusion.gripper_control import run
 from test_robotis import FakePacket,FakePort
 
 
 class GripperControlTests(unittest.TestCase):
+    def setUp(self):
+        ceiling = patch('neurofusion.adapters.robotis.load_position_ceiling',return_value=None)
+        ceiling.start()
+        self.addCleanup(ceiling.stop)
+
     def session(self,packet):
         sdk = types.SimpleNamespace(PortHandler=FakePort,PacketHandler=lambda protocol:packet)
         return patch.dict(sys.modules,{'dynamixel_sdk':sdk})
@@ -24,6 +29,14 @@ class GripperControlTests(unittest.TestCase):
             report = run(output=Path(root)/'status')
         self.assertTrue(report['passed'])
         self.assertFalse(report['final']['torque_enabled'])
+        self.assertEqual(packet.log,[])
+
+    def test_operator_ceiling_rejects_close_before_torque_or_any_write(self):
+        packet = FakePacket()
+        with tempfile.TemporaryDirectory() as root,self.session(packet),patch(
+                'neurofusion.adapters.robotis.load_position_ceiling',return_value=PositionBoundary(510,510)),contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(ValueError,'tightening boundary'):
+                run('close',steps=12,output=Path(root)/'blocked')
         self.assertEqual(packet.log,[])
 
     def test_close_open_and_absolute_move_use_measured_direction_and_disable(self):

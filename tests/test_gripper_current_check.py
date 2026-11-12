@@ -11,6 +11,11 @@ from test_robotis import FakePacket,FakePort
 
 
 class CurrentCheckTests(unittest.TestCase):
+    def setUp(self):
+        ceiling = patch('neurofusion.adapters.robotis.load_position_ceiling',return_value=None)
+        ceiling.start()
+        self.addCleanup(ceiling.stop)
+
     def session(self, packet):
         sdk = types.SimpleNamespace(PortHandler=FakePort,PacketHandler=lambda protocol:packet)
         return patch.dict(sys.modules,{'dynamixel_sdk':sdk})

@@ -1,12 +1,14 @@
 {
   "grip_closure": 0.44,
-  "slide_seconds": 0.5,
+  "slide_seconds": 0.0,
   "close_delay_seconds": 0.0,
   "expected_direction": "down",
   "confidence": 0.8,
-  "confirm_seconds": 0.03,
+  "confirm_seconds": 0.0,
+  "open_step": 0.0008695652173913044,
+  "open_step_interval": 0.5,
   "open_rate": 0.01,
   "close_rate": 0.03,
-  "max_open_delta": 0.015,
+  "max_open_delta": 0.0017391304347826088,
   "max_tracking_delta": 0.01
 }

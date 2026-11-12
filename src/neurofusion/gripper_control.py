@@ -61,12 +61,14 @@ def run(action='status', *, steps=12, position=None, hold_seconds=0.,
             report.update(initial=asdict(initial),model_number=device.model_number,
                           model_name=device.table.name,firmware=device.firmware,
                           limits=device.limits,current_cap_a=device.config.current_cap_a,
+                          position_ceiling_raw=device.position_ceiling_raw,
+                          command_ceiling_raw=device.command_ceiling_raw,
                           usb_low_latency_enabled=device.usb_low_latency_enabled)
             print(f'当前位置 {initial.position_raw}，使能 {int(initial.torque_enabled)}，'
                   f'实测电流 {initial.current_a:.4f} A',flush=True)
             if action != 'status':
                 # Reject impossible/large targets before any actuator write.
-                _target(action,initial.position_raw,steps,position,device.limits)
+                device._check_position_target(_target(action,initial.position_raw,steps,position,device.limits))
                 armed = device.arm()
                 record('armed',armed)
                 report['armed'] = asdict(armed)

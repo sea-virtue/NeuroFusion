@@ -6,7 +6,7 @@ from .slip import SlipPrediction
 
 
 class SNNRecognizer:
-    def __init__(self, checkpoint, device='cpu', *, expected_direction):
+    def __init__(self, checkpoint, device='cpu', *, expected_direction, fast_empty=True):
         import torch
         from ..models.gelneuro_unified_snn import GelNeuroUnifiedSNN
         self.torch,self.device = torch,device
@@ -20,6 +20,7 @@ class SNNRecognizer:
         self.model = GelNeuroUnifiedSNN.from_checkpoint(saved,self.bin_us).to(device).eval()
         self.model_id = 'sha256:'+hashlib.sha256(Path(checkpoint).read_bytes()).hexdigest()
         self.state,self.end_us,self.sequence = None,None,0
+        self.fast_empty = fast_empty
 
     def reset(self):
         self.state,self.end_us,self.sequence = None,None,0
@@ -37,7 +38,23 @@ class SNNRecognizer:
         if events.numel() == 0: events = events.reshape(0,4)
         counts = count_bins([events],start_us,end_us,self.bin_us,self.device)
         with self.torch.inference_mode():
-            task,direction,state = self.model(counts,self.state,alpha=1.)
+            if self.fast_empty and events.numel() == 0:
+                # These Conv/IAF cores have no bias and no membrane leak.
+                # With zero input, every membrane stays in [-1,1), no core
+                # spikes, and only the host trace decays. This advances every
+                # native bin without running redundant zero convolutions.
+                state = self.state
+                steps = counts.shape[1]
+                if state is None:
+                    _,_,state = self.model(counts[:,:1],None,alpha=1.)
+                    steps -= 1
+                state = (state[0],state[1]*self.model.decay.pow(steps))
+                logits = self.model.head(state[1].log1p().flatten(1))
+                task,direction = logits[:,:4].unsqueeze(1),logits[:,4:].unsqueeze(1)
+                self.model.last_activity = counts.new_zeros(4)
+                self.model.last_output_spikes = counts.new_zeros(1,counts.shape[1],16)
+            else:
+                task,direction,state = self.model(counts,self.state,alpha=1.)
             tp,dp = task[0,-1].softmax(-1),direction[0,-1].softmax(-1)
             ti,di = int(tp.argmax()),int(dp.argmax())
         self.state,self.end_us = state,end_us

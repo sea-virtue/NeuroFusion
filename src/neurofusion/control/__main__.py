@@ -2,6 +2,7 @@
 import argparse
 from dataclasses import asdict
 import json
+import math
 from pathlib import Path
 import queue
 import sys
@@ -41,13 +42,16 @@ def demo_rows(config):
         yield {'now_ns':now,'feedback':asdict(GripperFeedback(now,closure)),'snn':asdict(prediction)}
 
 
-def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_recording=None):
+def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_recording=None, control_hz=100.):
     """Periodic watchdog independent of stdin arrival. Stdin never supplies feedback.
 
     Input predictions must originate on this host monotonic clock. Any stream
     failure requests bounded re-closing; gripper failure still propagates to the
     existing driver's context cleanup. No mode changes or incident-lock bypass.
     """
+    if not math.isfinite(control_hz) or control_hz <= 0:
+        raise ValueError('control_hz must be finite and positive')
+    period = 1./control_hz
     from ..adapters.robotis import RobotisGripper, GripperConfig
     messages = queue.Queue(maxsize=64)
     overflow = threading.Event()
@@ -64,16 +68,38 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
         except BaseException as exc:
             overflow.set()
 
+    def drain_predictions(current):
+        while True:
+            try:
+                item = messages.get_nowait()
+                if isinstance(item,SlipPrediction):
+                    if current and item.sequence <= current.sequence:
+                        overflow.set()
+                    current = item
+                else:
+                    overflow.set()
+            except queue.Empty:
+                break
+        return None if overflow.is_set() else current
+
     controller,latest = SlipController(config),None
     episode = Episode(output,config,synthetic=False,tactile_recording=tactile_recording,
                       metadata={'execution':'robotis' if execute else 'live_shadow',
-                                'snn_input':'host_clock_stdin_jsonl','physical_stop_verified':False})
+                                'snn_input':'host_clock_stdin_jsonl','physical_stop_verified':False,
+                                'requested_control_hz':control_hz})
     try:
         with RobotisGripper(GripperConfig(port=port,allow_motion=execute)) as device:
+            episode.manifest['metadata'].update(
+                measured_position_ceiling_raw=getattr(device,'position_ceiling_raw',None),
+                command_position_ceiling_raw=getattr(device,'command_ceiling_raw',None),
+                driver_limits=getattr(device,'limits',None))
+            episode.save()
             # Arm only after an initial fresh classification. Never enable before
             # there is a usable SNN heartbeat or automatically clear motion hold.
             threading.Thread(target=read_input,daemon=True).start()
-            try: latest = messages.get(timeout=5.)
+            # Cold Torch/Samna startup happens in the publisher. The gripper
+            # remains unarmed here; motion-time freshness limits are unchanged.
+            try: latest = messages.get(timeout=15.)
             except queue.Empty: raise RuntimeError('No initial SNN prediction')
             now = time.monotonic_ns()
             if (not isinstance(latest,SlipPrediction) or latest.available_ns > now or
@@ -81,6 +107,7 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
                 raise RuntimeError('No fresh initial SNN prediction')
             if execute:
                 sample = device.read()
+                device._check_position_target(device.raw_position(config.grip_closure))
                 scale = device.limits['max_raw']-device.limits['min_raw']
                 if config.max_tracking_delta*scale > device.config.max_step_raw:
                     raise ValueError('Tracking bound exceeds driver per-command bound')
@@ -90,16 +117,7 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
             next_tick = time.monotonic()
             deadline = next_tick+config.release_timeout*2+config.slide_seconds+config.brake_timeout+5
             while time.monotonic() < deadline:
-                while True:
-                    try:
-                        item = messages.get_nowait()
-                        if isinstance(item,SlipPrediction):
-                            if latest and item.sequence <= latest.sequence:
-                                overflow.set()
-                            latest = item
-                        else: overflow.set()
-                    except queue.Empty: break
-                if overflow.is_set(): latest = None
+                latest = drain_predictions(latest)
                 sample = device.read()
                 device._healthy(sample)
                 if execute and (not sample.torque_enabled or abs(sample.current_a) > device.config.current_cap_a+.03):
@@ -108,20 +126,26 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
                 decision = episode.tick(controller,now,GripperFeedback(sample.host_ns,sample.closure),latest,
                                         device if execute else None,telemetry=asdict(sample))
                 if decision['phase'] in controller.terminal: break
-                next_tick += .02  # Target 50 Hz, measured tick gaps are checked.
+                next_tick += period
                 time.sleep(max(0.,next_tick-time.monotonic()))
             else: raise TimeoutError('Episode exceeded host watchdog')
             if execute and controller.phase == 'FINISHED':
                 print('Sequence finished; retaining grip. Support ruler, then Ctrl+C to disable torque.',flush=True)
+                next_hold_tick = time.monotonic()
                 try:
                     while True:
+                        # Keep consuming classifications during grip hold so
+                        # the bounded queue cannot block the live publisher.
+                        latest = drain_predictions(latest)
                         sample = device.read()
                         device._healthy(sample)
+                        device._check_motion_sample(sample)
                         if not sample.torque_enabled or abs(sample.current_a) > device.config.current_cap_a+.03:
                             raise RuntimeError('Gripper fault during final hold')
                         episode.tick(controller,time.monotonic_ns(),GripperFeedback(sample.host_ns,sample.closure),
-                                     None,telemetry=asdict(sample))
-                        time.sleep(.02)
+                                     latest,telemetry=asdict(sample))
+                        next_hold_tick += period
+                        time.sleep(max(0.,next_hold_tick-time.monotonic()))
                 except KeyboardInterrupt:
                     pass
             # Explicit release of torque is existing commissioning behavior;
@@ -143,6 +167,7 @@ def main():
     parser.add_argument('--execute',action='store_true')
     parser.add_argument('--port',default='/dev/ttyUSB0')
     parser.add_argument('--tactile-recording',type=Path)
+    parser.add_argument('--control-hz',type=float,default=100.)
     args = parser.parse_args()
     config = SlipConfig(**json.loads(args.config.read_text()))
     if args.mode != 'stream' and args.execute: parser.error('--execute is only valid in stream mode')
@@ -152,7 +177,8 @@ def main():
         with args.input.open() as handle:
             phase = replay(config,(json.loads(line) for line in handle),args.output)
     else:
-        phase = stream(config,args.output,execute=args.execute,port=args.port,tactile_recording=args.tactile_recording)
+        phase = stream(config,args.output,execute=args.execute,port=args.port,tactile_recording=args.tactile_recording,
+                       control_hz=args.control_hz)
     print(json.dumps({'phase':phase,'output':str(args.output),'hardware_execution_requested':args.execute}))
     return 0 if phase == 'FINISHED' else 1
 

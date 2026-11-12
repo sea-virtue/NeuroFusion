@@ -71,6 +71,9 @@ class FakePacket:
 
 class RobotisTests(unittest.TestCase):
     def setUp(self):
+        ceiling = patch('neurofusion.adapters.robotis.load_position_ceiling',return_value=None)
+        ceiling.start()
+        self.addCleanup(ceiling.stop)
         # Unit tests exercise logic behind the real-device incident interlock.
         self.hold = patch('neurofusion.adapters.robotis.motion_inhibit_reason',return_value=None)
         self.hold.start()

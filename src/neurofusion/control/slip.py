@@ -1,4 +1,4 @@
-"""Causal timer-based ruler slip teacher. Durations are NOT distances."""
+"""Causal ruler slip catch; zero slide_seconds recloses on first detection."""
 from dataclasses import dataclass, asdict
 import math
 
@@ -11,12 +11,12 @@ def positive(value, name, *, zero=False):
 @dataclass(frozen=True)
 class SlipConfig:
     grip_closure: float
-    slide_seconds: float = .5
+    slide_seconds: float = 0.
     # Not copied from the paper. Zero means no calibrated compensation yet.
     close_delay_seconds: float = 0.
     expected_direction: str = 'down'
     confidence: float = .8
-    confirm_seconds: float = .03
+    confirm_seconds: float = 0.
     max_prediction_age: float = .15
     max_feedback_age: float = .15
     max_tick_gap: float = .1
@@ -28,6 +28,10 @@ class SlipConfig:
     max_open_delta: float = .02
     max_tracking_delta: float = .01
     arrival_tolerance: float = .003
+    # Explicit closure fraction per opening step, e.g. 1/1150 for one raw count.
+    # None preserves continuous opening for legacy timed configurations.
+    open_step: float | None = None
+    open_step_interval: float = .5
 
     def __post_init__(self):
         if not math.isfinite(self.grip_closure) or not 0 < self.grip_closure <= 1:
@@ -36,16 +40,23 @@ class SlipConfig:
             raise ValueError('Map the physical downward axis to an SNN direction explicitly')
         if not 0 < self.confidence <= 1:
             raise ValueError('confidence must be in (0,1]')
-        for name in ('slide_seconds','max_prediction_age','max_feedback_age','max_tick_gap',
+        for name in ('max_prediction_age','max_feedback_age','max_tick_gap',
                      'release_timeout','brake_timeout','open_rate','close_rate','max_open_delta',
                      'max_tracking_delta','arrival_tolerance'):
             positive(getattr(self,name),name)
-        for name in ('close_delay_seconds','confirm_seconds','grip_settle_seconds'):
+        for name in ('slide_seconds','close_delay_seconds','confirm_seconds','grip_settle_seconds'):
             positive(getattr(self,name),name,zero=True)
-        if self.close_delay_seconds >= self.slide_seconds:
+        if self.slide_seconds == 0 and (self.close_delay_seconds != 0 or self.confirm_seconds != 0):
+            raise ValueError('Immediate catch permits neither confirmation delay nor time compensation')
+        if self.slide_seconds > 0 and self.close_delay_seconds >= self.slide_seconds:
             raise ValueError('Compensation must be shorter than the requested sliding interval')
         if self.max_open_delta >= self.grip_closure or self.max_tracking_delta > 1:
             raise ValueError('Invalid release or tracking range')
+        positive(self.open_step_interval,'open_step_interval')
+        if self.open_step is not None:
+            positive(self.open_step,'open_step')
+            if self.open_step > min(self.max_open_delta,self.max_tracking_delta):
+                raise ValueError('Opening step exceeds release or tracking bound')
 
 
 @dataclass(frozen=True)
@@ -105,9 +116,9 @@ class GripperCommand:
 class SlipController:
     """One controller per episode. Caller supplies periodic monotonic ticks.
 
-    A timer starts at the first *available* qualified SNN prediction, after
-    confirmation by distinct observations. It keeps running through quiet gaps;
-    quiet is not proof of stopped motion or contact. Faults never resume opening.
+    Zero slide_seconds catches the first fresh slide task without another timer
+    or direction gate. Timed mode confirms distinct predictions and keeps its
+    timer running through quiet gaps. Faults never resume opening.
     """
     terminal = ('FINISHED','FAULT')
 
@@ -122,6 +133,7 @@ class SlipController:
         self.stable_ns = None
         self.target = None
         self.revision = 0
+        self.last_open_step_ns = None
 
     def _phase(self, phase, now):
         self.phase, self.phase_ns, self.stable_ns = phase,now,None
@@ -163,7 +175,12 @@ class SlipController:
                          and prediction.direction_confidence >= c.confidence)
         downward = qualified and prediction.direction == c.expected_direction
         if new and self.phase in ('GRIPPING','OPENING','SLIDING'):
-            if qualified and not downward:
+            if c.slide_seconds == 0 and prediction.task == 'slide' and prediction.task_confidence >= c.confidence:
+                # Catch on the first new task detection, regardless of the
+                # uncalibrated image/world direction. No SLIDING timer phase.
+                self.onset_ns = prediction.available_ns
+                self._brake(now_ns)
+            elif qualified and not downward:
                 self._brake(now_ns,'unexpected_slide_direction')
             elif prediction.task in ('rotate','escape_wriggle') and prediction.task_confidence >= c.confidence:
                 self._brake(now_ns,'unexpected_contact_motion')
@@ -171,6 +188,11 @@ class SlipController:
             if abs(feedback.closure-c.grip_closure) <= c.arrival_tolerance:
                 if self.stable_ns is None: self.stable_ns = now_ns
                 if (now_ns-self.stable_ns)/1e9 >= c.grip_settle_seconds:
+                    # Feedback can reach grip before the previous incremental
+                    # target does (e.g. torque enable changes the loaded pose).
+                    # Opening must start from the calibrated grip, never from
+                    # that older, more-open target.
+                    self.target = c.grip_closure
                     self._phase('OPENING',now_ns)
             else: self.stable_ns = None
             if (now_ns-self.phase_ns)/1e9 > c.release_timeout:
@@ -201,12 +223,22 @@ class SlipController:
                 self._phase('FAULT',now_ns)
         if self.phase in self.terminal: return self._decision(now_ns,None)
         if self.phase == 'OPENING' and self.candidate_ns is None:
-            desired = max(c.grip_closure-c.max_open_delta,self.target-c.open_rate*dt)
+            if c.open_step is None:
+                desired = max(c.grip_closure-c.max_open_delta,self.target-c.open_rate*dt)
+            else:
+                arrived = abs(feedback.closure-self.target) <= c.arrival_tolerance
+                due = self.last_open_step_ns is None or now_ns-self.last_open_step_ns >= c.open_step_interval*1e9
+                desired = self.target
+                if arrived and due:
+                    desired = max(c.grip_closure-c.max_open_delta,self.target-c.open_step)
+                    self.last_open_step_ns = now_ns
+        elif self.phase in ('GRIPPING','BRAKING') and c.slide_seconds == 0:
+            desired = c.grip_closure
         elif self.phase in ('GRIPPING','BRAKING'):
             desired = self.target + max(-c.close_rate*dt,min(c.close_rate*dt,c.grip_closure-self.target))
         else:
             desired = self.target  # Keep the current aperture while timing sliding.
-        self.target = min(1.,max(0.,min(feedback.closure+c.max_tracking_delta,
+        self.target = min(c.grip_closure,max(0.,min(feedback.closure+c.max_tracking_delta,
                                       max(feedback.closure-c.max_tracking_delta,desired))))
         self.revision += 1
         return self._decision(now_ns,GripperCommand(now_ns,self.target,self.revision))

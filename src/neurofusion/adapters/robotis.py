@@ -18,6 +18,32 @@ def motion_inhibit_reason():
 
 
 @dataclass(frozen=True)
+class PositionBoundary:
+    measured_max_raw: int
+    target_max_raw: int
+
+
+def load_position_ceiling(config, model_number, limits, path=None):
+    """Operator-set mechanical boundary; keep hardware closure scaling intact."""
+    path = Path(path) if path is not None else Path(__file__).resolve().parents[3]/'configs/gripper-position-limits.local.json'
+    if not path.exists():
+        return None
+    saved = json.loads(path.read_text())
+    if (saved.get('schema_version') != 1 or saved.get('model_number') != model_number or
+            saved.get('device_id') != config.device_id or
+            Path(saved.get('port', '')).resolve() != Path(config.port).resolve() or
+            saved.get('min_raw') != limits['min_raw'] or saved.get('hardware_max_raw') != limits['max_raw']):
+        raise ValueError('Local position boundary does not match this gripper; recalibrate explicitly')
+    ceiling = saved.get('max_position_raw')
+    if type(ceiling) is not int or not limits['min_raw'] <= ceiling <= limits['max_raw']:
+        raise ValueError('Invalid operator position boundary')
+    margin = saved.get('command_margin_raw',0)
+    if type(margin) is not int or not 0 <= margin <= ceiling-limits['min_raw']:
+        raise ValueError('Invalid position command margin')
+    return PositionBoundary(ceiling,ceiling-margin)
+
+
+@dataclass(frozen=True)
 class ControlTable:
     name: str
     torque: int
@@ -170,6 +196,8 @@ class RobotisGripper:
         self.writes = []
         self.usb_low_latency_enabled = False
         self.usb_low_latency_error = None
+        self.position_ceiling_raw = None
+        self.command_ceiling_raw = None
 
     def __enter__(self):
         from dynamixel_sdk import PortHandler, PacketHandler
@@ -214,6 +242,10 @@ class RobotisGripper:
             }
             if self.limits['max_raw'] <= self.limits['min_raw']:
                 raise RuntimeError('Invalid hardware position limits')
+            boundary = load_position_ceiling(self.config,model,self.limits)
+            if boundary is not None:
+                self.position_ceiling_raw = boundary.measured_max_raw
+                self.command_ceiling_raw = boundary.target_max_raw
             if self.config.control_mode == 'position' and self.config.use_hardware_current_limit:
                 # Keep existing consumers of config.current_cap_a consistent with
                 # the ceiling actually written; never change EEPROM Current Limit.
@@ -248,6 +280,8 @@ class RobotisGripper:
     def _write(self, address, size, value):
         if not self.config.allow_motion:
             raise RuntimeError('Read-only session')
+        if address == self.table.goal_position and size == 4:
+            self._check_position_target(value)
         attempt = {'sent_ns':time.monotonic_ns(),'address':address,'size':size,'value':value}
         self.writes.append(attempt)
         result,error = getattr(self._packet,f'write{size}ByteTxRx')(
@@ -268,6 +302,8 @@ class RobotisGripper:
         if not self.config.allow_motion:
             raise RuntimeError('Read-only session')
         data = bytes(data)
+        if address == self.table.goal_position and len(data) >= 4:
+            self._check_position_target(int.from_bytes(data[:4],'little',signed=True))
         attempt = dict(sent_ns=time.monotonic_ns(),address=address,
                        size=len(data),data=list(data))
         self.writes.append(attempt)
@@ -275,6 +311,11 @@ class RobotisGripper:
             self._port,self.config.device_id,address,len(data),list(data))
         attempt.update(acknowledged_ns=time.monotonic_ns(),result=result,error=error)
         self._check(result,error)
+
+    def _check_position_target(self, target):
+        if self.command_ceiling_raw is not None and target > self.command_ceiling_raw:
+            raise ValueError(f'Target {target} exceeds operator tightening boundary {self.command_ceiling_raw} '
+                             f'(measured position limit {self.position_ceiling_raw})')
 
     def _require_mode(self, mode):
         if self.config.control_mode != mode or self.limits['mode'] != OPERATING_MODES[mode]:
@@ -372,6 +413,8 @@ class RobotisGripper:
             raise RuntimeError(f'USB low-latency setup failed; motion not started: {self.usb_low_latency_error}')
         self.limits['mode'] = self._read(11,1)
         self._require_mode(self.config.control_mode)
+        if self.position_ceiling_raw is not None and self.config.control_mode != 'position':
+            raise RuntimeError('Operator position boundary requires position mode; current-mode motion is blocked')
         if self.limits['return_level'] != 2:
             raise RuntimeError('Requires write replies; EEPROM is not changed by arm')
         sample = self.read()
@@ -380,6 +423,7 @@ class RobotisGripper:
             raise RuntimeError('Another controller may be active; commissioning requires torque initially off')
         t = self.table
         self._origin = sample.position_raw
+        preload = min(sample.position_raw,self.command_ceiling_raw) if self.command_ceiling_raw is not None else sample.position_raw
         self._saved = ({address:(size,self._read(address,size)) for address,size in
             ((t.goal_current,2),(t.profile_velocity,4),(t.profile_acceleration,4))}
             if self.config.control_mode == 'position' else {})
@@ -392,7 +436,7 @@ class RobotisGripper:
         self._motion_started = True  # cleanup even if a WRITE reply is lost
         if self.config.control_mode == 'position':
             self._write(t.profile_acceleration,4,1)
-            self._write_position_profile(sample.position_raw,current,velocity)
+            self._write_position_profile(preload,current,velocity)
         else:
             # A nonzero Mode 0 preload would start driving as soon as torque is on.
             self._write(t.goal_current,2,0)
@@ -401,7 +445,7 @@ class RobotisGripper:
             # RN hardware retest: a disabled-state preload alone did not hold.
             # Refresh the measured position immediately after torque-on, before
             # any feedback queries, to start the active position trajectory.
-            self._write(t.goal_position,4,sample.position_raw)
+            self._write(t.goal_position,4,preload)
         after = self.read()
         self._healthy(after)
         self._check_motion_sample(after)
@@ -421,6 +465,7 @@ class RobotisGripper:
         if proposal.time_ns > time.monotonic_ns() or time.monotonic_ns()-proposal.time_ns > 1_000_000_000:
             raise ValueError('Command timestamp is stale or in the future')
         target = self.raw_position(float(proposal.robotis[0]))
+        self._check_position_target(target)
         sample = self.read()
         self._healthy(sample)
         self._check_motion_sample(sample)
@@ -464,6 +509,8 @@ class RobotisGripper:
         return receipt
 
     def _check_motion_sample(self, sample):
+        if self.position_ceiling_raw is not None and sample.position_raw > self.position_ceiling_raw:
+            raise RuntimeError('Measured position exceeds operator tightening boundary')
         if not sample.torque_enabled or abs(sample.position_raw-self._origin) > self.config.session_radius_raw+3:
             raise RuntimeError('Torque loss or movement outside session range')
         if abs(sample.current_a) > self.config.current_cap_a+.03:
@@ -520,6 +567,12 @@ class RobotisGripper:
 
     def disarm(self):
         self._armed = False
+        # This adapter owns one serial connection and runs SDK calls serially.
+        # Ctrl+C inside rxPacket can strand the SDK's Python-only busy latch.
+        # Release that abandoned transaction before the new torque-off write;
+        # never retry the interrupted position/current command.
+        if getattr(self._port,'is_using',False):
+            self._port.is_using = False
         # Even if zero-current WRITE fails, attempt torque-off in the finally block.
         zero_error = None
         try:
