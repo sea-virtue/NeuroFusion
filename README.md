@@ -82,3 +82,8 @@ GelNeuro/Speck与GelSight真实输入已同时接入正式编码器、记忆和�
 ## 2026-11-11 SNN主链
 
 训练入口默认使用`configs/pipeline-snn.toml`，已接入归档的训练后SNN与跨包膜电位/历史迹，输出64维特征进入融合和动作头。先冻结SNN与视觉骨干，训练投影、融合和动作头；CNN保留作对照。52项测试、12种组合、三步合成训练和真实双触觉离线前向通过。详情、复现命令及真实训练缺口见[本轮验证](docs/snn-flow-validation.md)。旧live_check仍是CNN联调入口，不把离线通过视为SNN已在线/上芯片或机器人闭环完成。
+
+
+## 2026-11-11：SNN 计时滑移教师
+
+新增独立一维尺子滑移控制器：夹持、有限松开、SNN方向确认、默认0.5秒墙钟计时、夹紧及教师日志。代码`src/neurofusion/control/`；[使用与数据边界](docs/slip-teacher.md)，配置`configs/slip-teacher.example.json`。保持现有机械臂/ROBOTIS接口不变，本控制器未启动实机；2026-11-12上游驱动已通过空载小行程复测并清除旧故障锁，见[复测记录](docs/gripper-retest-20261112.md)。新增16项控制测试在拉取后的驱动上通过，当前SNN checkpoint离线加载通过。原始采集程序的实时窗口/预测发布仍需接线，未宣称整机闭环完成。

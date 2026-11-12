@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-12",
+  "base_commit": "515a5d4",
+  "new_control_tests_passed": 16,
+  "updated_robotis_tests_passed": 27,
+  "hardware_commands_sent": 0,
+  "driver_modified": false,
+  "scope": "Compatibility after upstream startup and device current-limit fixes; software mocks only",
+  "unresolved": [
+    "live raw-acquisition prediction publisher not wired",
+    "grip_closure and release parameters require ruler-specific calibration",
+    "timed sliding does not estimate distance"
+  ]
+}

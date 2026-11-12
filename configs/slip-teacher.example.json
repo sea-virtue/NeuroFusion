@@ -1,0 +1,12 @@
+{
+  "grip_closure": 0.44,
+  "slide_seconds": 0.5,
+  "close_delay_seconds": 0.0,
+  "expected_direction": "down",
+  "confidence": 0.8,
+  "confirm_seconds": 0.03,
+  "open_rate": 0.01,
+  "close_rate": 0.03,
+  "max_open_delta": 0.015,
+  "max_tracking_delta": 0.01
+}

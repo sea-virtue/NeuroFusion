@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-11",
+  "new_control_tests_passed": 16,
+  "existing_robotis_tests_passed": 9,
+  "actual_snn_checkpoint": "artifacts/checkpoints/gelneuro-snn-20261111/final/all-data.pt",
+  "checkpoint_sha256": "d28753b7bb9494bb6e21bbf32d096421090f473675bddd9e5cc0a44eb65e2ee8",
+  "native_bin_us": 1000,
+  "software_fixture_phases": [
+    "GRIPPING",
+    "OPENING",
+    "SLIDING",
+    "BRAKING",
+    "FINISHED"
+  ],
+  "trace_rows": 401,
+  "synthetic": true,
+  "hardware_commands_sent": 0,
+  "existing_driver_and_policy_files_unchanged": true,
+  "limits": [
+    "raw acquisition publisher not yet wired",
+    "no live mechanical verification",
+    "no distance estimate",
+    "no full-policy BC training adapter"
+  ]
+}

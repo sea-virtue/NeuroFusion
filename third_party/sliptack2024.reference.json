@@ -1,0 +1,34 @@
+{
+  "title": "Fast In-Hand Slip Control on Unfeatured Objects with Programmable Tactile Sensing",
+  "doi": "10.1109/LRA.2024.3400148",
+  "checked_date": "2026-11-11",
+  "status": "reference_only_official_code_not_located",
+  "official_code_url": null,
+  "official_code_commit": null,
+  "code_copied": false,
+  "hardware_executed": false,
+  "source_page": "https://edg.berkeley.edu/publication/fast-in-hand-slip-control-on-unfeatured-objects-with-programmable-tactile-sensing/",
+  "video_url": "https://www.youtube.com/watch?v=MKm3UeJY-y8",
+  "paper_url": "https://escholarship.org/content/qt9k30z443/qt9k30z443.pdf",
+  "paper_local_path_from_project": "../文献资料/01_论文/07_受控滑移与示教_2026-11-11/Fast_In_Hand_Slip_Control_Gloumakov_2024.pdf",
+  "paper_downloaded": false,
+  "paper_download_status": "HTTP 403 from repository in both WSL and Windows; web reader accessed full text",
+  "paper_bytes": null,
+  "paper_sha256": null,
+  "reference_notes": "third_party/sliptack2024-reference/README.md",
+  "collection_plan": "docs/slip-bc-collection.md",
+  "audit": {
+    "checked": [
+      "author publication page",
+      "author lab demo page",
+      "paper full text",
+      "GitHub repository search"
+    ],
+    "github_repository_queries": {
+      "SlipTack": 0,
+      "\"Fast In-Hand Slip\"": 0,
+      "Gloumakov": 0
+    },
+    "limitation": "Repository name/description search is not an exhaustive code search; no claim that private or differently named source does not exist."
+  }
+}

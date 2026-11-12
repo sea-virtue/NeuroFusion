@@ -25,3 +25,8 @@ ResNet18 使用 Torchvision 0.21.0 实现，来源为 https://github.com/pytorch
 上游导入的特别处理：ACT 的 `detr_vae.py` 顶层会连带导入相机/DETR/IPython。适配层用 AST 读取原文件的类/函数定义并原样执行，只省略无关的顶层导入；Transformer/CVAE/MLP 定义未重写。ACT 输入边界从图像特征改接共享状态 token，并替换原来硬编码的机器人/动作维度。这属于 ACT 结构的条件适配，不等同于原论文完整视觉 ACT 复现。
 
 2026-11-04新增官方夹爪示例`robotis_rh_p12_rn_example`（Apache-2.0），固定提交见sources.lock.json。仅核对旧版RN控制表和使能顺序，未运行上游自动开合。
+
+
+## SlipTack 2024：待取得作者源码
+
+2026-11-11 核查指定论文 DOI `10.1109/LRA.2024.3400148`，尚未找到可验证的官方源码仓库，未克隆代码。来源及下载状态见 [独立参考登记](sliptack2024.reference.json)，核查说明见 `sliptack2024-reference/README.md`；[真机 BC 采集方案](../docs/slip-bc-collection.md)。这不是可恢复的上游 checkout，因此不加入 `sources.lock.json`。
