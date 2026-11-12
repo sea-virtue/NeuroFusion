@@ -1,4 +1,6 @@
 {
-  "reason": "2026-11-04 reboot retest: hold target502 drifted toward open; zero-current active-goal refresh reported current-103 (~-414mA). Keep normal motion inhibited pending independent diagnosis.",
-  "latest_record": "docs/gripper-communication.md"
+  "reason": null,
+  "status": "cleared_after_bounded_position_retest",
+  "resolution": "2026-11-12: configure Linux FTDI low latency on connection and refresh measured position immediately after torque-on. Three stationary holds and six 12-count round trips passed on RN 35073 firmware 25, Mode 5, current ceiling 820 raw. Explicit allow_motion, step/session bounds, telemetry checks and torque-off cleanup remain required. Full-stroke, contact-force and Mode 0 motion are not validated by these trials.",
+  "latest_record": "docs/gripper-retest-20261112.md"
 }

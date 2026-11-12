@@ -1,4 +1,6 @@
-> 最新夹爪实机：重启后两次受控诊断仍未通过，现使能关闭，正常运动锁保留。命令频率、线上格式及复测证据见[最新说明](docs/gripper-communication.md)。
+> 最新夹爪实机（2026-11-12）：修正使能后目标刷新与 USB 延迟后，三次保持、八次小行程往返及正式驱动接口验证通过。现使能关闭；电流上限沿用设备值。详见[本次复测](docs/gripper-retest-20261112.md)。
+
+手动开合入口：`./scripts/gripper.sh status`、`./scripts/gripper.sh close --steps 12 --hold-seconds 2`、`./scripts/gripper.sh open --steps 12`。操作和实测说明见[夹爪手动控制](docs/gripper-manual-control.md)。
 
 # NeuroFusion
 

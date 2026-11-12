@@ -168,6 +168,8 @@ class RobotisGripper:
         self._motion_started = False
         self._saved = {}
         self.writes = []
+        self.usb_low_latency_enabled = False
+        self.usb_low_latency_error = None
 
     def __enter__(self):
         from dynamixel_sdk import PortHandler, PacketHandler
@@ -180,6 +182,18 @@ class RobotisGripper:
         try:
             if not self._port.openPort() or not self._port.setBaudRate(self.config.baud):
                 raise RuntimeError('Cannot open configured U2D2 serial port')
+            # Linux FTDI defaults to a 16 ms receive latency after reconnection.
+            # pyserial's unprivileged ioctl sets the driver low-latency flag;
+            # this changes host USB buffering, not any actuator register.
+            self.usb_low_latency_enabled = False
+            self.usb_low_latency_error = None
+            low_latency = getattr(getattr(self._port,'ser',None),'set_low_latency_mode',None)
+            if low_latency is not None:
+                try:
+                    low_latency(True)
+                    self.usb_low_latency_enabled = True
+                except (OSError,ValueError,NotImplementedError) as error:
+                    self.usb_low_latency_error = str(error)
             self._packet = PacketHandler(2.)
             model,result,error = self._packet.ping(self._port,self.config.device_id)
             self._check(result,error)
@@ -354,6 +368,8 @@ class RobotisGripper:
             raise RuntimeError(f'Physical motion inhibited: {reason}')
         if not self.config.allow_motion or self._motion_started:
             raise RuntimeError('Explicit, new motion session required')
+        if self.usb_low_latency_error is not None:
+            raise RuntimeError(f'USB low-latency setup failed; motion not started: {self.usb_low_latency_error}')
         self.limits['mode'] = self._read(11,1)
         self._require_mode(self.config.control_mode)
         if self.limits['return_level'] != 2:
@@ -381,6 +397,11 @@ class RobotisGripper:
             # A nonzero Mode 0 preload would start driving as soon as torque is on.
             self._write(t.goal_current,2,0)
         self._write(t.torque,1,1)
+        if self.config.control_mode == 'position':
+            # RN hardware retest: a disabled-state preload alone did not hold.
+            # Refresh the measured position immediately after torque-on, before
+            # any feedback queries, to start the active position trajectory.
+            self._write(t.goal_position,4,sample.position_raw)
         after = self.read()
         self._healthy(after)
         self._check_motion_sample(after)

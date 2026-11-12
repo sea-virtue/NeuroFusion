@@ -1,0 +1,1934 @@
+{
+  "date": "2026-11-12",
+  "hardware_test_git_revision": "4ffacccb85d10ea532e20562a0ccec1cbf4916c0",
+  "result": "passed_bounded_mode5_position_control_after_initialization_fix",
+  "operator_confirmed_empty_clear_secured": true,
+  "operator_power_off_confirmed": false,
+  "hardware_test_used_original_hold_window": true,
+  "stricter_hold_tolerance_hardware_retested": true,
+  "readonly_initial": {
+    "passed": true,
+    "exercise": false,
+    "trained_policy_commands_sent": 0,
+    "current_unit": "A",
+    "force_newtons_measured": false,
+    "timing_basis": "host receipt proxy; not intrinsic mechanical latency",
+    "model_number": 35073,
+    "firmware": 25,
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "initial": {
+      "host_ns": 2634242365100,
+      "position_raw": 352,
+      "closure": 0.3060869565217391,
+      "velocity_raw": 0,
+      "current_a": 0.00402,
+      "voltage_v": 23.400000000000002,
+      "temperature_c": 40,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 352,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "final": {
+      "host_ns": 2634290361788,
+      "position_raw": 352,
+      "closure": 0.3060869565217391,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.400000000000002,
+      "temperature_c": 40,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 352,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "writes": []
+  },
+  "hardware_hold": {
+    "passed": false,
+    "stage": "hold",
+    "operator_confirmed_empty_clear_secured": true,
+    "prior_motion_hold": "2026-11-04 reboot retest: hold target502 drifted toward open; zero-current active-goal refresh reported current-103 (~-414mA). Keep normal motion inhibited pending independent diagnosis.",
+    "network_commands_sent": 0,
+    "force_newtons_measured": false,
+    "trials": [],
+    "cleanup": {
+      "torque_off_confirmed": true,
+      "ram_profile_restored": true
+    },
+    "initial": {
+      "host_ns": 2859017839093,
+      "position_raw": 352,
+      "closure": 0.3060869565217391,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.400000000000002,
+      "temperature_c": 41,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 352,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "firmware": 25,
+    "initialization": "measured position with positive current ceiling and velocity; preload before torque-on",
+    "final": {
+      "host_ns": 2859468212826,
+      "position_raw": 234,
+      "closure": 0.20347826086956522,
+      "velocity_raw": -40,
+      "current_a": 0.0,
+      "voltage_v": 22.900000000000002,
+      "temperature_c": 41,
+      "moving": true,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 261,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "error": "RuntimeError('Position 315 outside diagnostic range [348,377]')",
+    "writes": [
+      {
+        "sent_ns": 2859066146524,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 2859082164636,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 2859082172894,
+        "address": 596,
+        "size": 10,
+        "data": [
+          96,
+          1,
+          0,
+          0,
+          4,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 2859098311693,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 2859178781425,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 2859194760432,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 2859259135362,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 2859275240404,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 2859355680053,
+        "address": 596,
+        "size": 4,
+        "value": 261,
+        "acknowledged_ns": 2859371756700,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 2859371760519,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 2859387781842,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 2859387784525,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 2859403870197,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 2859403875253,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 2859419950574,
+        "result": 0,
+        "error": 0
+      }
+    ]
+  },
+  "hardware_trace": [
+    {
+      "kind": "profile",
+      "host_ns": 2859162653800,
+      "current_raw": 820,
+      "current_cap_a": 3.2964,
+      "velocity_raw": 4,
+      "velocity_cap_rpm": 0.456,
+      "acceleration_raw": 1
+    },
+    {
+      "kind": "sample",
+      "host_ns": 2859178755188,
+      "phase": "pre-enable",
+      "query_start_ns": 2859162692915,
+      "query_end_ns": 2859178741563,
+      "goal_raw": 352,
+      "profile_velocity_raw": 4,
+      "goal_current_raw": 820,
+      "acceleration_raw": 1,
+      "moving": false,
+      "position_raw": 352,
+      "velocity_raw": 0,
+      "current_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.400000000000002,
+      "temperature_c": 41
+    },
+    {
+      "kind": "torque_enable_request",
+      "host_ns": 2859178776009
+    },
+    {
+      "kind": "sample",
+      "host_ns": 2859210858986,
+      "phase": "enable-hold",
+      "query_start_ns": 2859194763626,
+      "query_end_ns": 2859210850640,
+      "goal_raw": 352,
+      "profile_velocity_raw": 4,
+      "goal_current_raw": 820,
+      "acceleration_raw": 1,
+      "moving": true,
+      "position_raw": 348,
+      "velocity_raw": -16,
+      "current_raw": -64,
+      "current_a": -0.25728,
+      "voltage_v": 23.400000000000002,
+      "temperature_c": 41
+    },
+    {
+      "kind": "sample",
+      "host_ns": 2859259104038,
+      "phase": "enable-hold",
+      "query_start_ns": 2859246105346,
+      "query_end_ns": 2859259091184,
+      "goal_raw": 352,
+      "profile_velocity_raw": 4,
+      "goal_current_raw": 820,
+      "acceleration_raw": 1,
+      "moving": true,
+      "position_raw": 315,
+      "velocity_raw": -84,
+      "current_raw": -18,
+      "current_a": -0.07236000000000001,
+      "voltage_v": 23.400000000000002,
+      "temperature_c": 41
+    }
+  ],
+  "readonly_after_abort": {
+    "passed": true,
+    "exercise": false,
+    "trained_policy_commands_sent": 0,
+    "current_unit": "A",
+    "force_newtons_measured": false,
+    "timing_basis": "host receipt proxy; not intrinsic mechanical latency",
+    "model_number": 35073,
+    "firmware": 25,
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "initial": {
+      "host_ns": 2878047924621,
+      "position_raw": 222,
+      "closure": 0.19304347826086957,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.3,
+      "temperature_c": 41,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 261,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "final": {
+      "host_ns": 2878096140520,
+      "position_raw": 222,
+      "closure": 0.19304347826086957,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.3,
+      "temperature_c": 41,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 261,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "writes": []
+  },
+  "software_validation_after_hold_guard_fix": {
+    "tests_run": 32,
+    "passed": true,
+    "failures": 0,
+    "errors": 0,
+    "dependency_exclusions": [
+      {
+        "test": "test_robotis.RobotisTests.test_current_feedback_cannot_be_reported_as_executed_position",
+        "reason": "PyTorch not installed; policy integration dependency"
+      },
+      {
+        "test": "test_robotis.RobotisTests.test_measured_feedback_preserves_arm_fields_and_requires_fresh_arrival",
+        "reason": "PyTorch not installed; policy integration dependency"
+      }
+    ]
+  },
+  "operator_observed_previous_real_movement": true,
+  "operator_reported_power_on_when_authorizing_continued_tests": true,
+  "operator_authorized_continued_bounded_tests_after_initial_failure": true,
+  "sdk_independent_probe": {
+    "actuator_register_writes": [],
+    "reads": {
+      "firmware": {
+        "address": 6,
+        "size": 1,
+        "value": 25,
+        "query_ms": 0.866474
+      },
+      "id": {
+        "address": 7,
+        "size": 1,
+        "value": 1,
+        "query_ms": 0.989582
+      },
+      "baud_code": {
+        "address": 8,
+        "size": 1,
+        "value": 4,
+        "query_ms": 1.005468
+      },
+      "return_delay": {
+        "address": 9,
+        "size": 1,
+        "value": 250,
+        "query_ms": 0.990841
+      },
+      "operating_mode": {
+        "address": 11,
+        "size": 1,
+        "value": 5,
+        "query_ms": 1.008293
+      },
+      "current_limit": {
+        "address": 30,
+        "size": 2,
+        "value": 820,
+        "query_ms": 0.993663
+      },
+      "velocity_limit": {
+        "address": 32,
+        "size": 4,
+        "value": 100,
+        "query_ms": 1.00397
+      },
+      "torque_enabled": {
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "query_ms": 0.997055
+      },
+      "position_d_gain": {
+        "address": 590,
+        "size": 2,
+        "value": 200,
+        "query_ms": 0.999354
+      },
+      "position_i_gain": {
+        "address": 592,
+        "size": 2,
+        "value": 0,
+        "query_ms": 1.000005
+      },
+      "position_p_gain": {
+        "address": 594,
+        "size": 2,
+        "value": 30,
+        "query_ms": 1.00037
+      },
+      "goal_position": {
+        "address": 596,
+        "size": 4,
+        "value": 261,
+        "query_ms": 1.000311
+      },
+      "goal_velocity": {
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "query_ms": 1.000567
+      },
+      "goal_current": {
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "query_ms": 0.999468
+      },
+      "goal_acceleration": {
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "query_ms": 1.000064
+      },
+      "position": {
+        "address": 611,
+        "size": 4,
+        "value": 222,
+        "query_ms": 1.000646
+      },
+      "velocity": {
+        "address": 615,
+        "size": 4,
+        "value": 0,
+        "query_ms": 1.000458
+      },
+      "current": {
+        "address": 621,
+        "size": 2,
+        "value": 0,
+        "query_ms": 1.000362
+      },
+      "voltage": {
+        "address": 623,
+        "size": 2,
+        "value": 233,
+        "query_ms": 0.998926
+      },
+      "temperature": {
+        "address": 625,
+        "size": 1,
+        "value": 42,
+        "query_ms": 1.000476
+      },
+      "registered_instruction": {
+        "address": 890,
+        "size": 1,
+        "value": 0,
+        "query_ms": 0.99939
+      },
+      "return_level": {
+        "address": 891,
+        "size": 1,
+        "value": 2,
+        "query_ms": 1.001133
+      },
+      "hardware_error": {
+        "address": 892,
+        "size": 1,
+        "value": 0,
+        "query_ms": 0.999109
+      }
+    },
+    "passed": true,
+    "model_number": 35073,
+    "latency_ms_before": "16",
+    "usb_low_latency_set": true,
+    "latency_ms_after": "1"
+  },
+  "active_goal_roundtrip": {
+    "passed": true,
+    "operator_ready": true,
+    "operator_observed_previous_real_movement": true,
+    "production_motion_lock": "2026-11-12 retest with hardware current ceiling 820 raw (3.2964 A): stationary target 352 remained unchanged but measured position fell 352->348->315 after torque-on; test aborted and torque-off confirmed. Later read-only position settled at 222, velocity/current zero. No open/close trials executed. Keep normal motion inhibited pending independent diagnosis; prior 2026-11-04 incidents remain unresolved.",
+    "initialization": "preload while disabled; torque on; immediately send origin+8 goal",
+    "eeprom_or_pid_writes": false,
+    "trials": [
+      {
+        "label": "fresh-close-8",
+        "start_raw": 222,
+        "target_raw": 230,
+        "command_ack_ms": 0.976954,
+        "first_observed_3_count_change_ms": 217.755072,
+        "first_within_2_counts_ms": 305.651106,
+        "settled_after_ms": 505.425115,
+        "steady_mean_raw": 229.2972972972973,
+        "steady_mean_error_raw": -0.7027027027027027,
+        "steady_max_abs_error_raw": 2,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 23.874598043487175,
+        "peak_abs_current_a": 0.20904,
+        "sample_interval_ms_median": 3.996324,
+        "sample_interval_ms_max": 6.013365,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 121,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency"
+      },
+      {
+        "start_raw": 230,
+        "target_raw": 222,
+        "command_ack_ms": 1.020802,
+        "first_observed_3_count_change_ms": 183.77509,
+        "first_within_2_counts_ms": 283.686062,
+        "settled_after_ms": 493.443444,
+        "steady_mean_raw": 223.05405405405406,
+        "steady_mean_error_raw": 1.054054054054054,
+        "steady_max_abs_error_raw": 2,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 24.484621828004848,
+        "peak_abs_current_a": 0.21708,
+        "sample_interval_ms_median": 3.996997,
+        "sample_interval_ms_max": 5.999016,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 118,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "return-origin",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.456
+      }
+    ],
+    "cleanup": {
+      "torque_off_confirmed": true,
+      "ram_profile_restored": true
+    },
+    "initial": {
+      "host_ns": 3302952825852,
+      "position_raw": 222,
+      "closure": 0.19304347826086957,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.3,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 261,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "firmware": 25,
+    "allowed_position_raw": [
+      218,
+      234
+    ],
+    "final": {
+      "host_ns": 3304025624070,
+      "position_raw": 223,
+      "closure": 0.19391304347826088,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 22.900000000000002,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 223,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "writes": [
+      {
+        "sent_ns": 3302955823761,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3302956814068,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3302956818846,
+        "address": 596,
+        "size": 10,
+        "data": [
+          222,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3302957813100,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3302962868523,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 3302963808596,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3302963811291,
+        "address": 596,
+        "size": 4,
+        "value": 230,
+        "acknowledged_ns": 3302964786833,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3303472255602,
+        "address": 596,
+        "size": 4,
+        "value": 222,
+        "acknowledged_ns": 3303473272950,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3303965833883,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 3303966691076,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3304018652081,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3304019640351,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3304019644982,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 3304020617085,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3304020618856,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3304021615620,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3304021616605,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3304022615405,
+        "result": 0,
+        "error": 0
+      }
+    ]
+  },
+  "refreshed_stationary_holds": {
+    "passed": true,
+    "operator_ready": true,
+    "holds": [
+      {
+        "trial": 0,
+        "initial": {
+          "host_ns": 3375263171031,
+          "position_raw": 223,
+          "closure": 0.19391304347826088,
+          "velocity_raw": 0,
+          "current_a": 0.0,
+          "voltage_v": 23.3,
+          "temperature_c": 42,
+          "moving": false,
+          "torque_enabled": false,
+          "hardware_error": 0,
+          "goal_position_raw": 223,
+          "timestamp_basis": "host_receipt_proxy",
+          "operating_mode": 5,
+          "goal_current_a": 3.2964
+        },
+        "position_min_raw": 221,
+        "position_max_raw": 223,
+        "peak_abs_current_a": 0.9607800000000001,
+        "sample_count": 142
+      },
+      {
+        "trial": 1,
+        "initial": {
+          "host_ns": 3375936022613,
+          "position_raw": 223,
+          "closure": 0.19391304347826088,
+          "velocity_raw": 0,
+          "current_a": 0.0,
+          "voltage_v": 23.0,
+          "temperature_c": 42,
+          "moving": false,
+          "torque_enabled": false,
+          "hardware_error": 0,
+          "goal_position_raw": 223,
+          "timestamp_basis": "host_receipt_proxy",
+          "operating_mode": 5,
+          "goal_current_a": 3.2964
+        },
+        "position_min_raw": 221,
+        "position_max_raw": 223,
+        "peak_abs_current_a": 1.12158,
+        "sample_count": 142
+      },
+      {
+        "trial": 2,
+        "initial": {
+          "host_ns": 3376608662219,
+          "position_raw": 223,
+          "closure": 0.19391304347826088,
+          "velocity_raw": 0,
+          "current_a": 0.0,
+          "voltage_v": 23.0,
+          "temperature_c": 42,
+          "moving": false,
+          "torque_enabled": false,
+          "hardware_error": 0,
+          "goal_position_raw": 223,
+          "timestamp_basis": "host_receipt_proxy",
+          "operating_mode": 5,
+          "goal_current_a": 3.2964
+        },
+        "position_min_raw": 223,
+        "position_max_raw": 224,
+        "peak_abs_current_a": 0.09246,
+        "sample_count": 142
+      }
+    ],
+    "cleanup": {
+      "torque_off_confirmed": true,
+      "ram_profile_restored": true
+    },
+    "initialization": "preload measured position; enable; immediately rewrite same position",
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "model_number": 35073,
+    "firmware": 25,
+    "final": {
+      "host_ns": 3377281001421,
+      "position_raw": 223,
+      "closure": 0.19391304347826088,
+      "velocity_raw": 0,
+      "current_a": -0.00402,
+      "voltage_v": 23.1,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 223,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "writes": [
+      {
+        "sent_ns": 3375263182299,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3375264172608,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375264177137,
+        "address": 596,
+        "size": 10,
+        "data": [
+          223,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3375265185955,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375270262863,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 3375271235360,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375271236777,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3375272243904,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375875623010,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 3375876540529,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375928994405,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3375930000493,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375930004942,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 3375931014795,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375931016366,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3375932027798,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375932028615,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3375932993749,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375936035286,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3375937038110,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375937045919,
+        "address": 596,
+        "size": 10,
+        "data": [
+          223,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3375938035223,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375943106919,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 3375944090280,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3375944092513,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3375945093840,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376548269118,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 3376549166414,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376601598558,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3376602597481,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376602601572,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 3376603603169,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376603604552,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3376604612323,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376604613034,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3376605620511,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376608677160,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3376609661061,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376609667055,
+        "address": 596,
+        "size": 10,
+        "data": [
+          223,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3376610665612,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376615737663,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 3376616715681,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3376616716729,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3376617723602,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3377220637647,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 3377221526187,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3377273955557,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3377274951181,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3377274955638,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 3377275959412,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3377275960556,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3377276968000,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3377276969175,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3377277985122,
+        "result": 0,
+        "error": 0
+      }
+    ]
+  },
+  "corrected_benchmark": {
+    "passed": true,
+    "stage": "compare",
+    "operator_confirmed_empty_clear_secured": true,
+    "prior_motion_hold": "2026-11-12 retest with hardware current ceiling 820 raw (3.2964 A): stationary target 352 remained unchanged but measured position fell 352->348->315 after torque-on; test aborted and torque-off confirmed. Later read-only position settled at 222, velocity/current zero. No open/close trials executed. Keep normal motion inhibited pending independent diagnosis; prior 2026-11-04 incidents remain unresolved.",
+    "network_commands_sent": 0,
+    "force_newtons_measured": false,
+    "trials": [
+      {
+        "start_raw": 223,
+        "target_raw": 235,
+        "command_ack_ms": 0.972413,
+        "first_observed_3_count_change_ms": 211.500909,
+        "first_within_2_counts_ms": 434.977334,
+        "settled_after_ms": 636.561095,
+        "steady_mean_raw": 234.33333333333334,
+        "steady_mean_error_raw": -0.6666666666666666,
+        "steady_max_abs_error_raw": 2,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 26.054997461852444,
+        "peak_abs_current_a": 0.22512000000000001,
+        "sample_interval_ms_median": 3.992201,
+        "sample_interval_ms_max": 5.997088,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 152,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v4-r0-close",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.456
+      },
+      {
+        "start_raw": 235,
+        "target_raw": 223,
+        "command_ack_ms": 0.97113,
+        "first_observed_3_count_change_ms": 179.581173,
+        "first_within_2_counts_ms": 405.102445,
+        "settled_after_ms": 654.563314,
+        "steady_mean_raw": 224.05555555555554,
+        "steady_mean_error_raw": 1.0555555555555556,
+        "steady_max_abs_error_raw": 2,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 27.01648577915756,
+        "peak_abs_current_a": 0.22110000000000002,
+        "sample_interval_ms_median": 3.993027,
+        "sample_interval_ms_max": 5.992019,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 156,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v4-r0-open",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.456
+      },
+      {
+        "start_raw": 224,
+        "target_raw": 235,
+        "command_ack_ms": 0.94948,
+        "first_observed_3_count_change_ms": 241.427475,
+        "first_within_2_counts_ms": 439.02171699999997,
+        "settled_after_ms": 640.608847,
+        "steady_mean_raw": 234.47222222222223,
+        "steady_mean_error_raw": -0.5277777777777778,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 23.853540307260538,
+        "peak_abs_current_a": 0.22914,
+        "sample_interval_ms_median": 3.9922215000000003,
+        "sample_interval_ms_max": 6.002767,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 153,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v4-r1-close",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.456
+      },
+      {
+        "start_raw": 235,
+        "target_raw": 223,
+        "command_ack_ms": 0.975624,
+        "first_observed_3_count_change_ms": 187.593881,
+        "first_within_2_counts_ms": 413.131987,
+        "settled_after_ms": 648.657815,
+        "steady_mean_raw": 224,
+        "steady_mean_error_raw": 1,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 26.625873440295972,
+        "peak_abs_current_a": 0.27738,
+        "sample_interval_ms_median": 3.992083,
+        "sample_interval_ms_max": 6.002182,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 155,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v4-r1-open",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.456
+      },
+      {
+        "start_raw": 224,
+        "target_raw": 235,
+        "command_ack_ms": 0.974993,
+        "first_observed_3_count_change_ms": 241.522433,
+        "first_within_2_counts_ms": 443.11274000000003,
+        "settled_after_ms": 644.717753,
+        "steady_mean_raw": 234.38888888888889,
+        "steady_mean_error_raw": -0.6111111111111112,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 23.445249822627275,
+        "peak_abs_current_a": 0.18894,
+        "sample_interval_ms_median": 3.992718,
+        "sample_interval_ms_max": 6.014463,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 154,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v4-r2-close",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.456
+      },
+      {
+        "start_raw": 235,
+        "target_raw": 223,
+        "command_ack_ms": 0.976132,
+        "first_observed_3_count_change_ms": 179.629289,
+        "first_within_2_counts_ms": 409.188746,
+        "settled_after_ms": 626.782413,
+        "steady_mean_raw": 224,
+        "steady_mean_error_raw": 1,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 26.88245976344618,
+        "peak_abs_current_a": 0.25326,
+        "sample_interval_ms_median": 3.993584,
+        "sample_interval_ms_max": 6.008221,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 150,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v4-r2-open",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.456
+      },
+      {
+        "start_raw": 224,
+        "target_raw": 235,
+        "command_ack_ms": 0.971572,
+        "first_observed_3_count_change_ms": 221.552959,
+        "first_within_2_counts_ms": 385.24101,
+        "settled_after_ms": 588.858799,
+        "steady_mean_raw": 234.51351351351352,
+        "steady_mean_error_raw": -0.4864864864864865,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 27.290743302519935,
+        "peak_abs_current_a": 0.18894,
+        "sample_interval_ms_median": 3.992624,
+        "sample_interval_ms_max": 6.000515,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 141,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v8-r0-close",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.912
+      },
+      {
+        "start_raw": 235,
+        "target_raw": 223,
+        "command_ack_ms": 0.945242,
+        "first_observed_3_count_change_ms": 175.618777,
+        "first_within_2_counts_ms": 325.360296,
+        "settled_after_ms": 568.905614,
+        "steady_mean_raw": 224,
+        "steady_mean_error_raw": 1,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 33.8086734467441,
+        "peak_abs_current_a": 0.16884000000000002,
+        "sample_interval_ms_median": 3.993464,
+        "sample_interval_ms_max": 6.005818,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 136,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v8-r0-open",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.912
+      },
+      {
+        "start_raw": 224,
+        "target_raw": 235,
+        "command_ack_ms": 0.991822,
+        "first_observed_3_count_change_ms": 229.569452,
+        "first_within_2_counts_ms": 385.345961,
+        "settled_after_ms": 588.946525,
+        "steady_mean_raw": 234.48648648648648,
+        "steady_mean_error_raw": -0.5135135135135135,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 27.21317347993816,
+        "peak_abs_current_a": 0.19296000000000002,
+        "sample_interval_ms_median": 3.993313,
+        "sample_interval_ms_max": 6.007047,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 141,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v8-r1-close",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.912
+      },
+      {
+        "start_raw": 235,
+        "target_raw": 223,
+        "command_ack_ms": 0.970464,
+        "first_observed_3_count_change_ms": 169.681894,
+        "first_within_2_counts_ms": 333.41223199999996,
+        "settled_after_ms": 535.045657,
+        "steady_mean_raw": 223.83783783783784,
+        "steady_mean_error_raw": 0.8378378378378378,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 33.47856224471741,
+        "peak_abs_current_a": 0.16482,
+        "sample_interval_ms_median": 3.993554,
+        "sample_interval_ms_max": 5.99966,
+        "telemetry_peak_speed_rpm": 1.368,
+        "samples": 128,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v8-r1-open",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.912
+      },
+      {
+        "start_raw": 224,
+        "target_raw": 235,
+        "command_ack_ms": 0.975403,
+        "first_observed_3_count_change_ms": 229.616176,
+        "first_within_2_counts_ms": 379.325139,
+        "settled_after_ms": 589.014093,
+        "steady_mean_raw": 234.48648648648648,
+        "steady_mean_error_raw": -0.5135135135135135,
+        "steady_max_abs_error_raw": 1,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 27.64511340885974,
+        "peak_abs_current_a": 0.20904,
+        "sample_interval_ms_median": 3.9939305000000003,
+        "sample_interval_ms_max": 6.015412,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 141,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v8-r2-close",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.912
+      },
+      {
+        "start_raw": 235,
+        "target_raw": 223,
+        "command_ack_ms": 0.956663,
+        "first_observed_3_count_change_ms": 175.664623,
+        "first_within_2_counts_ms": 317.44436199999996,
+        "settled_after_ms": 519.111259,
+        "steady_mean_raw": 224.02777777777777,
+        "steady_mean_error_raw": 1.0277777777777777,
+        "steady_max_abs_error_raw": 2,
+        "overshoot_raw": 0,
+        "mean_endpoint_speed_counts_s": 34.56423718819183,
+        "peak_abs_current_a": 0.27738,
+        "sample_interval_ms_median": 3.993909,
+        "sample_interval_ms_max": 6.002541,
+        "telemetry_peak_speed_rpm": 0.912,
+        "samples": 124,
+        "timing_basis": "host command start to returned encoder feedback; 3-count threshold, not intrinsic motor or physical force latency",
+        "label": "i820-v8-r2-open",
+        "current_cap_a": 3.2964,
+        "velocity_cap_rpm": 0.912
+      }
+    ],
+    "cleanup": {
+      "torque_off_confirmed": true,
+      "ram_profile_restored": true
+    },
+    "initial": {
+      "host_ns": 3527565854614,
+      "position_raw": 223,
+      "closure": 0.19391304347826088,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.3,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 223,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "firmware": 25,
+    "usb_low_latency_enabled": true,
+    "usb_low_latency_error": null,
+    "initialization": "preload measured position, current ceiling and velocity; torque on; immediately refresh measured position",
+    "hold_passed": true,
+    "final": {
+      "host_ns": 3535512343297,
+      "position_raw": 224,
+      "closure": 0.19478260869565217,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 22.900000000000002,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 224,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "writes": [
+      {
+        "sent_ns": 3527568852170,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3527569844640,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3527569849886,
+        "address": 596,
+        "size": 10,
+        "data": [
+          223,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3527570824700,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3527575864488,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 3527576829585,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3527576831501,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3527577804620,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3528179455702,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3528180449283,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3528180457981,
+        "address": 596,
+        "size": 10,
+        "data": [
+          223,
+          0,
+          0,
+          0,
+          4,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3528181445086,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3528186461916,
+        "address": 596,
+        "size": 4,
+        "value": 235,
+        "acknowledged_ns": 3528187432973,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3528824040758,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3528825009771,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3529479640819,
+        "address": 596,
+        "size": 4,
+        "value": 235,
+        "acknowledged_ns": 3529480587940,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3530121263991,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3530122238265,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3530770936824,
+        "address": 596,
+        "size": 4,
+        "value": 235,
+        "acknowledged_ns": 3530771910685,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3531416671700,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3531417646538,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3532044537855,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3532045488677,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3532045492992,
+        "address": 596,
+        "size": 10,
+        "data": [
+          223,
+          0,
+          0,
+          0,
+          8,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3532046480072,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3532051468704,
+        "address": 596,
+        "size": 4,
+        "value": 235,
+        "acknowledged_ns": 3532052438306,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3532643383881,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3532644325891,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3533213304876,
+        "address": 596,
+        "size": 4,
+        "value": 235,
+        "acknowledged_ns": 3533214294296,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3533805268402,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3533806237583,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3534341332322,
+        "address": 596,
+        "size": 4,
+        "value": 235,
+        "acknowledged_ns": 3534342306452,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3534933350690,
+        "address": 596,
+        "size": 4,
+        "value": 223,
+        "acknowledged_ns": 3534934304950,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3535452577473,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 3535453453717,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3535505395881,
+        "address": 596,
+        "size": 4,
+        "value": 224,
+        "acknowledged_ns": 3535506356925,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3535506361663,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 3535507347545,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3535507348989,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3535508347114,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3535508347746,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3535509345628,
+        "result": 0,
+        "error": 0
+      }
+    ]
+  },
+  "production_driver_api": {
+    "passed": true,
+    "operator_ready": true,
+    "interface": "arm -> command -> wait -> disarm",
+    "manual_physical_goals": true,
+    "trained_policy_commands_sent": 0,
+    "trials": [
+      {
+        "label": "close-12",
+        "receipt": {
+          "sent_ns": 3847473008343,
+          "acknowledged_ns": 3847474014668,
+          "target_raw": 236,
+          "target_closure": 0.20521739130434782
+        },
+        "measured": {
+          "host_ns": 3847954914402,
+          "position_raw": 235,
+          "closure": 0.20434782608695654,
+          "velocity_raw": 0,
+          "current_a": 0.01608,
+          "voltage_v": 22.900000000000002,
+          "temperature_c": 42,
+          "moving": false,
+          "torque_enabled": true,
+          "hardware_error": 0,
+          "goal_position_raw": 236,
+          "timestamp_basis": "host_receipt_proxy",
+          "operating_mode": 5,
+          "goal_current_a": 3.2964
+        }
+      },
+      {
+        "label": "return-origin",
+        "receipt": {
+          "sent_ns": 3847957893169,
+          "acknowledged_ns": 3847958884795,
+          "target_raw": 224,
+          "target_closure": 0.19478260869565217
+        },
+        "measured": {
+          "host_ns": 3848386681007,
+          "position_raw": 225,
+          "closure": 0.1956521739130435,
+          "velocity_raw": 0,
+          "current_a": -0.036180000000000004,
+          "voltage_v": 22.900000000000002,
+          "temperature_c": 42,
+          "moving": false,
+          "torque_enabled": true,
+          "hardware_error": 0,
+          "goal_position_raw": 224,
+          "timestamp_basis": "host_receipt_proxy",
+          "operating_mode": 5,
+          "goal_current_a": 3.2964
+        }
+      }
+    ],
+    "initial": {
+      "host_ns": 3847456031397,
+      "position_raw": 224,
+      "closure": 0.19478260869565217,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.3,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 224,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "model_number": 35073,
+    "firmware": 25,
+    "motion_inhibit_reason": null,
+    "usb_low_latency_enabled": true,
+    "armed": {
+      "host_ns": 3847469997430,
+      "position_raw": 224,
+      "closure": 0.19478260869565217,
+      "velocity_raw": 0,
+      "current_a": -0.804,
+      "voltage_v": 23.3,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": true,
+      "hardware_error": 0,
+      "goal_position_raw": 224,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "final": {
+      "host_ns": 3848394677589,
+      "position_raw": 225,
+      "closure": 0.1956521739130435,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 22.900000000000002,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 224,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "writes": [
+      {
+        "sent_ns": 3847463037501,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 3847464016258,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3847464020612,
+        "address": 596,
+        "size": 10,
+        "data": [
+          224,
+          0,
+          0,
+          0,
+          5,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 3847465016197,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3847465017589,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 3847466015358,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3847466016433,
+        "address": 596,
+        "size": 4,
+        "value": 224,
+        "acknowledged_ns": 3847467014950,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3847473008683,
+        "address": 596,
+        "size": 4,
+        "value": 236,
+        "acknowledged_ns": 3847474013466,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3847957893838,
+        "address": 596,
+        "size": 4,
+        "value": 224,
+        "acknowledged_ns": 3847958881022,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3848386736707,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 3848387678140,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3848388681204,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 3848389677765,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3848389679191,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3848390678281,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 3848390678986,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 3848391673806,
+        "result": 0,
+        "error": 0
+      }
+    ]
+  },
+  "software_validation_final": {
+    "tests_run": 36,
+    "passed": true,
+    "failures": 0,
+    "errors": 0,
+    "dependency_exclusions": [
+      {
+        "test": "test_robotis.RobotisTests.test_current_feedback_cannot_be_reported_as_executed_position",
+        "reason": "PyTorch not installed; policy integration dependency"
+      },
+      {
+        "test": "test_robotis.RobotisTests.test_measured_feedback_preserves_arm_fields_and_requires_fresh_arrival",
+        "reason": "PyTorch not installed; policy integration dependency"
+      }
+    ]
+  },
+  "final_motion_lock": {
+    "reason": null,
+    "status": "cleared_after_bounded_position_retest",
+    "resolution": "2026-11-12: configure Linux FTDI low latency on connection and refresh measured position immediately after torque-on. Three stationary holds and six 12-count round trips passed on RN 35073 firmware 25, Mode 5, current ceiling 820 raw. Explicit allow_motion, step/session bounds, telemetry checks and torque-off cleanup remain required. Full-stroke, contact-force and Mode 0 motion are not validated by these trials.",
+    "latest_record": "docs/gripper-retest-20261112.md"
+  },
+  "validated_scope": "RN 35073 firmware 25, Mode 5, empty gripper; 3 stationary holds and 8 small round trips; no full stroke, contact load, Mode 0 or hard real-time validation",
+  "final_source_sha256": {
+    "src/neurofusion/adapters/robotis.py": "46fd421f29b17091709350e96ef12d1b6a8e0b7527e86e3479964617016a6c99",
+    "src/neurofusion/gripper_benchmark.py": "9ab3a4895300414010d6394b73239655cc611611def54fa6e850e657cd0130d0"
+  },
+  "final_guard_only_changes_after_hardware_tests": [
+    "Reset USB low-latency status on reentering a driver instance",
+    "Reject diagnostic motion when supported USB low-latency setup fails; covered by an additional regression test"
+  ],
+  "hardware_test_git_revision_note": "Base revision for original failure; later successful tests used the local source changes documented in this record."
+}

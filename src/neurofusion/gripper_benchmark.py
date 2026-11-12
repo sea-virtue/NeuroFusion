@@ -99,7 +99,7 @@ class Bench:
         self.emit('profile',current_raw=current_raw,current_cap_a=current_raw*.00402,
                   velocity_raw=velocity_raw,velocity_cap_rpm=velocity_raw*.114,acceleration_raw=1)
 
-    def monitor(self,target,seconds,phase,require_settle=False):
+    def monitor(self,target,seconds,phase,require_settle=False,max_target_error_raw=None):
         samples = []
         deadline = time.monotonic()+seconds
         stable_since = None
@@ -107,6 +107,11 @@ class Bench:
             sample = self.sample(phase)
             samples.append(sample)
             validate_sample(sample,target=target,low=self.low,high=self.high,current_raw=self.current_raw)
+            # A stationary hold must not use the wider travel window that is
+            # needed for the subsequent position steps. Abort on the first
+            # out-of-tolerance hold sample, before additional status queries.
+            if max_target_error_raw is not None and abs(sample['position_raw']-target) > max_target_error_raw:
+                raise RuntimeError(f"Hold position {sample['position_raw']} differs from target {target} by more than {max_target_error_raw} counts")
             if sample['profile_velocity_raw'] != self.velocity_raw or sample['goal_current_raw'] != self.current_raw:
                 raise RuntimeError('Profile changed unexpectedly after enabling torque')
             if len(samples)%10 == 1:
@@ -155,13 +160,17 @@ def run(output,stage,operator_ready=False):
         with d,(output/'trace.jsonl').open('x') as trace:
             if d.model_number != 35073:
                 raise ValueError('This commissioning block is verified only for RN model 35073')
+            if d.usb_low_latency_error is not None:
+                raise RuntimeError(f'USB low-latency setup failed; motion not started: {d.usb_low_latency_error}')
             initial = d.read()
             d._healthy(initial)
             if initial.torque_enabled or d.limits['mode'] != 5 or d.limits['return_level'] != 2:
                 raise RuntimeError('Require initially disabled current-based position mode and write replies')
             if not 5 <= initial.position_raw <= 1120:
                 raise RuntimeError('Too close to a hard stop for the initial commissioning range')
-            report.update(initial=asdict(initial),limits=d.limits,firmware=d.firmware)
+            report.update(initial=asdict(initial),limits=d.limits,firmware=d.firmware,
+                          usb_low_latency_enabled=d.usb_low_latency_enabled,
+                          usb_low_latency_error=d.usb_low_latency_error)
             bench = Bench(d,trace,initial.position_raw)
             t = d.table
             saved = {address:(size,d._read(address,size)) for address,size in
@@ -171,13 +180,15 @@ def run(output,stage,operator_ready=False):
                 # Preload measured position/velocity/ceiling before torque-on, as
                 # in the supplied RN reference. Do not force a changed target or
                 # diagnose zero-current drift as a failed position controller.
-                report['initialization']='measured position with positive current ceiling and velocity; preload before torque-on'
+                report['initialization']='preload measured position, current ceiling and velocity; torque on; immediately refresh measured position'
                 bench.profile(bench.current_raw,4,position=initial.position_raw)
                 bench.sample('pre-enable')
                 enabled_attempted = True
                 bench.emit('torque_enable_request')
                 d._write(t.torque,1,1)
-                bench.monitor(initial.position_raw,.6,'enable-hold')
+                d._write(t.goal_position,4,initial.position_raw)
+                bench.monitor(initial.position_raw,.6,'enable-hold',
+                              max_target_error_raw=d.config.tolerance_raw)
                 report['hold_passed'] = True
                 print('Enable/hold passed; goal and measured position stayed inside bounds',flush=True)
                 if stage != 'hold':

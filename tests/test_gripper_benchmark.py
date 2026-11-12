@@ -60,7 +60,65 @@ class GripperBenchmarkTests(unittest.TestCase):
         self.assertEqual(int.from_bytes(profile[:4],'little'),503)
         self.assertEqual(int.from_bytes(profile[8:],'little'),820)
         self.assertNotIn((604,0),packet.log)
-        monitor.assert_called_once_with(503,.6,'enable-hold')
+        monitor.assert_called_once_with(503,.6,'enable-hold',max_target_error_raw=3)
+
+    def test_hold_drift_inside_travel_window_disables_before_sending_movement(self):
+        import json
+        import sys
+        import types
+        from test_robotis import FakePort,FakePacket
+
+        class DriftingPacket(FakePacket):
+            active_samples = 0
+
+            def readTxRx(self, port, device, address, size):
+                if self.values[562]:
+                    # Four counts of drift was previously accepted by the
+                    # general [origin-4, origin+25] movement window.
+                    self.values[611] = 499
+                    self.active_samples += 1
+                return super().readTxRx(port, device, address, size)
+
+        packet = DriftingPacket()
+        sdk = types.SimpleNamespace(PortHandler=FakePort,PacketHandler=lambda protocol:packet)
+        with tempfile.TemporaryDirectory() as root,patch.dict(sys.modules,{'dynamixel_sdk':sdk}),patch(
+                'neurofusion.gripper_benchmark.time.sleep'),contextlib.redirect_stdout(io.StringIO()):
+            output = Path(root)/'drift'
+            with self.assertRaisesRegex(RuntimeError,'Hold position 499 differs from target 503'):
+                run(output,'small',operator_ready=True)
+            report = json.loads((output/'report.json').read_text())
+        self.assertEqual(packet.active_samples,1)
+        self.assertEqual(packet.values[562],0)
+        self.assertTrue(report['cleanup']['torque_off_confirmed'])
+        self.assertTrue(report['cleanup']['ram_profile_restored'])
+        self.assertFalse(report['passed'])
+        self.assertNotIn('hold_passed',report)
+        self.assertEqual(report['trials'],[])
+        # Only the immediate same-position refresh and disabled cleanup preload
+        # are written; no subsequent opening/closing target is sent.
+        self.assertEqual([value for address,value in packet.log
+                          if address == 596 and isinstance(value,int)],[503,499])
+
+    def test_failed_low_latency_setup_prevents_diagnostic_register_writes(self):
+        import json
+        import sys
+        import types
+        from test_robotis import FakePort,FakePacket
+        class FailedLatencyPort(FakePort):
+            def __init__(self,name):
+                super().__init__(name)
+                def configure(enabled):
+                    raise ValueError('driver refused')
+                self.ser = types.SimpleNamespace(set_low_latency_mode=configure)
+        packet = FakePacket()
+        sdk = types.SimpleNamespace(PortHandler=FailedLatencyPort,PacketHandler=lambda protocol:packet)
+        with tempfile.TemporaryDirectory() as root,patch.dict(sys.modules,{'dynamixel_sdk':sdk}),contextlib.redirect_stdout(io.StringIO()):
+            output = Path(root)/'latency-failed'
+            with self.assertRaisesRegex(RuntimeError,'low-latency setup failed'):
+                run(output,'small',operator_ready=True)
+            self.assertFalse(json.loads((output/'report.json').read_text())['passed'])
+        self.assertEqual(packet.log,[])
+        self.assertEqual(packet.values[562],0)
 
 
 if __name__ == '__main__': unittest.main()

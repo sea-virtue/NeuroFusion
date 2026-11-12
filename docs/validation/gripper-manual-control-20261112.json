@@ -1,0 +1,209 @@
+{
+  "date": "2026-11-12",
+  "hardware_demo": {
+    "passed": true,
+    "action": "close",
+    "steps": 12,
+    "hold_seconds": 2.0,
+    "port": "/dev/ttyUSB0",
+    "baud": 2000000,
+    "device_id": 1,
+    "trained_policy_commands_sent": 0,
+    "franka_commands_sent": 0,
+    "initial": {
+      "host_ns": 7239953448596,
+      "position_raw": 225,
+      "closure": 0.1956521739130435,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.3,
+      "temperature_c": 43,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 224,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "model_number": 35073,
+    "model_name": "RH-P12-RN",
+    "firmware": 25,
+    "limits": {
+      "mode": 5,
+      "min_raw": 0,
+      "max_raw": 1150,
+      "current_raw": 820,
+      "velocity_raw": 100,
+      "acceleration_raw": 255,
+      "min_voltage_v": 15.0,
+      "max_voltage_v": 40.0,
+      "return_level": 2
+    },
+    "current_cap_a": 3.2964,
+    "usb_low_latency_enabled": true,
+    "armed": {
+      "host_ns": 7239967441470,
+      "position_raw": 225,
+      "closure": 0.1956521739130435,
+      "velocity_raw": 0,
+      "current_a": -0.8241,
+      "voltage_v": 23.3,
+      "temperature_c": 43,
+      "moving": false,
+      "torque_enabled": true,
+      "hardware_error": 0,
+      "goal_position_raw": 225,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "target_raw": 237,
+    "receipt": {
+      "sent_ns": 7239970440632,
+      "acknowledged_ns": 7239971432761,
+      "target_raw": 237,
+      "target_closure": 0.20608695652173914
+    },
+    "reached": {
+      "host_ns": 7240453004974,
+      "position_raw": 236,
+      "closure": 0.20521739130434782,
+      "velocity_raw": 0,
+      "current_a": 0.024120000000000003,
+      "voltage_v": 22.900000000000002,
+      "temperature_c": 42,
+      "moving": false,
+      "torque_enabled": true,
+      "hardware_error": 0,
+      "goal_position_raw": 237,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "final": {
+      "host_ns": 7242460899533,
+      "position_raw": 237,
+      "closure": 0.20608695652173914,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.3,
+      "temperature_c": 43,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 237,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "writes": [
+      {
+        "sent_ns": 7239960472844,
+        "address": 606,
+        "size": 4,
+        "value": 1,
+        "acknowledged_ns": 7239961444660,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7239961452213,
+        "address": 596,
+        "size": 10,
+        "data": [
+          225,
+          0,
+          0,
+          0,
+          5,
+          0,
+          0,
+          0,
+          52,
+          3
+        ],
+        "acknowledged_ns": 7239962442306,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7239962443734,
+        "address": 562,
+        "size": 1,
+        "value": 1,
+        "acknowledged_ns": 7239963443504,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7239963444915,
+        "address": 596,
+        "size": 4,
+        "value": 225,
+        "acknowledged_ns": 7239964442107,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7239970440879,
+        "address": 596,
+        "size": 4,
+        "value": 237,
+        "acknowledged_ns": 7239971432162,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7242453117903,
+        "address": 562,
+        "size": 1,
+        "value": 0,
+        "acknowledged_ns": 7242453911384,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7242454917869,
+        "address": 604,
+        "size": 2,
+        "value": 820,
+        "acknowledged_ns": 7242455909118,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7242455911497,
+        "address": 600,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 7242456915649,
+        "result": 0,
+        "error": 0
+      },
+      {
+        "sent_ns": 7242456917302,
+        "address": 606,
+        "size": 4,
+        "value": 0,
+        "acknowledged_ns": 7242457901855,
+        "result": 0,
+        "error": 0
+      }
+    ]
+  },
+  "hold_summary": {
+    "samples": 38,
+    "position_min_raw": 236,
+    "position_max_raw": 237,
+    "first_sample_host_ns": 7240455987741,
+    "last_sample_host_ns": 7242418937962
+  },
+  "new_unit_tests": {
+    "tests_run": 5,
+    "passed": true
+  },
+  "source_report": "outputs/gripper-control/close-y4o8ih6c/report.json",
+  "exact_command": "PYTHONPATH=src .venv/bin/python -m neurofusion.gripper_control close --steps 12 --hold-seconds 2",
+  "equivalent_launcher": "./scripts/gripper.sh close --steps 12 --hold-seconds 2"
+}

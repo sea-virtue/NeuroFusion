@@ -105,8 +105,9 @@ class RobotisTests(unittest.TestCase):
         with mock,device:
             device.arm()
             payload = (503).to_bytes(4,'little')+(5).to_bytes(4,'little')+(49).to_bytes(2,'little')
-            self.assertEqual(packet.log[:3],[(t.profile_acceleration,1),
-                                           (t.goal_position,payload),(t.torque,1)])
+            self.assertEqual(packet.log[:4],[(t.profile_acceleration,1),
+                                           (t.goal_position,payload),(t.torque,1),
+                                           (t.goal_position,503)])
             self.assertGreater(packet.values[t.profile_velocity],0)
             self.assertLessEqual(packet.values[t.goal_current]*t.current_unit_a,.2)
         self.assertEqual(packet.values[t.torque],0)
@@ -119,8 +120,85 @@ class RobotisTests(unittest.TestCase):
         with mock,device:
             device.arm()
             self.assertEqual([address for address,value in packet.log],
-                [t.profile_acceleration,t.goal_current,t.profile_velocity,t.goal_position,t.torque])
+                [t.profile_acceleration,t.goal_current,t.profile_velocity,t.goal_position,t.torque,t.goal_position])
             self.assertTrue(all(isinstance(value,int) for _,value in packet.log))
+
+    def test_low_latency_is_configured_before_ping_and_failure_keeps_reads_available(self):
+        for failure in (False,True):
+            with self.subTest(failure=failure):
+                events = []
+                class LowLatencyPort(FakePort):
+                    def __init__(self,name):
+                        super().__init__(name)
+                        def configure(enabled):
+                            events.append(('low_latency',enabled))
+                            if failure:
+                                raise ValueError('driver refused')
+                        self.ser = types.SimpleNamespace(set_low_latency_mode=configure)
+                class OrderedPacket(FakePacket):
+                    def ping(self,port,device):
+                        events.append(('ping',device))
+                        return super().ping(port,device)
+                packet = OrderedPacket()
+                sdk = types.SimpleNamespace(PortHandler=LowLatencyPort,PacketHandler=lambda protocol:packet)
+                with patch.dict(sys.modules,{'dynamixel_sdk':sdk}),RobotisGripper(
+                        GripperConfig(allow_motion=True)) as device:
+                    self.assertEqual(device.read().position_raw,503)
+                    self.assertEqual(events[:2],[('low_latency',True),('ping',1)])
+                    self.assertEqual(device.usb_low_latency_enabled,not failure)
+                    if failure:
+                        with self.assertRaisesRegex(RuntimeError,'low-latency setup failed'):
+                            device.arm()
+                        self.assertEqual(packet.log,[])
+                    else:
+                        self.assertIsNone(device.usb_low_latency_error)
+
+    def test_position_arm_refreshes_active_goal_before_feedback_can_follow_stale_trajectory(self):
+        class StaleTrajectoryPacket(FakePacket):
+            needs_refresh = False
+            def __getattr__(self,name):
+                operation = super().__getattr__(name)
+                if not name.startswith('write'):
+                    return operation
+                def write(port,device,address,value):
+                    result = operation(port,device,address,value)
+                    if address == 562 and value == 1:
+                        self.needs_refresh = True
+                    elif address == 596 and self.values[562]:
+                        self.needs_refresh = False
+                    return result
+                return write
+            def readTxRx(self,port,device,address,size):
+                if self.values[562] and self.needs_refresh:
+                    self.values[611] = 450
+                return super().readTxRx(port,device,address,size)
+        mock,device,packet = self.session(StaleTrajectoryPacket(),allow_motion=True)
+        with mock,device:
+            armed = device.arm()
+            self.assertEqual(armed.position_raw,503)
+            self.assertFalse(packet.needs_refresh)
+        self.assertEqual(packet.values[562],0)
+
+    def test_failed_active_position_refresh_still_disables_and_restores(self):
+        class FailedRefreshPacket(FakePacket):
+            def __getattr__(self,name):
+                operation = super().__getattr__(name)
+                if name != 'write4ByteTxRx':
+                    return operation
+                def write(port,device,address,value):
+                    if address == 596 and self.values[562]:
+                        self.log.append((address,value))
+                        return -1001,0
+                    return operation(port,device,address,value)
+                return write
+        mock,device,packet = self.session(FailedRefreshPacket(),allow_motion=True)
+        with self.assertRaisesRegex(RuntimeError,'transport'):
+            with mock,device:
+                device.arm()
+        self.assertEqual(packet.values[562],0)
+        self.assertEqual(packet.values[604],820)
+        self.assertEqual(packet.values[600],0)
+        self.assertTrue(device._port.closed)
 
     def test_position_uses_read_device_limit_and_matching_feedback_threshold(self):
         for model,limit in ((35073,820),(35073,500),(35074,820)):
