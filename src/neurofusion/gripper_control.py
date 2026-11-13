@@ -1,11 +1,11 @@
 """Manual, bounded RH-P12 position commands without model dependencies.
 
 close/open move relative to measured position, in encoder counts, not mm.
-Each command is limited to 20 counts. Torque is disabled at the end, including
-after the optional hold interval. Motion subcommands explicitly request motion.
+Manual motion uses the hardware position range and operator position ceiling.
+Torque is disabled at the end, including after the optional hold interval.
 """
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 import math
 from pathlib import Path
@@ -20,17 +20,19 @@ def _target(action, origin, steps, position, limits):
     target = position if action == 'move' else origin + (steps if action == 'close' else -steps)
     if not limits['min_raw'] <= target <= limits['max_raw']:
         raise ValueError(f'Target {target} outside device position limits')
-    if abs(target-origin) > 20:
-        raise ValueError('Manual command permits at most 20 position counts per invocation')
     return target
 
 
 def run(action='status', *, steps=12, position=None, hold_seconds=0.,
-        port='/dev/ttyUSB0', baud=2_000_000, device_id=1, output=None):
+        port='/dev/ttyUSB0', baud=2_000_000, device_id=1, output=None, acceleration='max',speed='max'):
     if action not in ('status','close','open','move'):
         raise ValueError('Action must be status, close, open, or move')
-    if type(steps) is not int or not 1 <= steps <= 20:
-        raise ValueError('Use an integer --steps between 1 and 20; steps are encoder counts, not mm')
+    if acceleration not in ('max','low'):
+        raise ValueError('acceleration must be max or low')
+    if speed not in ('max','low'):
+        raise ValueError('speed must be max or low')
+    if type(steps) is not int or steps < 1:
+        raise ValueError('Use a positive integer --steps; steps are encoder counts, not mm')
     if action == 'move' and type(position) is not int:
         raise ValueError('move requires an integer --position')
     if action != 'move' and position is not None:
@@ -40,7 +42,8 @@ def run(action='status', *, steps=12, position=None, hold_seconds=0.,
     if action == 'status' and hold_seconds:
         raise ValueError('status does not enable torque or hold position')
     device = RobotisGripper(GripperConfig(
-        port=port,baud=baud,device_id=device_id,allow_motion=action != 'status'))
+        port=port,baud=baud,device_id=device_id,allow_motion=action != 'status',
+        use_max_acceleration=acceleration == 'max',use_max_velocity=speed == 'max'))
     if output is None:
         root = Path('outputs/gripper-control')
         root.mkdir(parents=True,exist_ok=True)
@@ -50,9 +53,17 @@ def run(action='status', *, steps=12, position=None, hold_seconds=0.,
         output.mkdir(parents=True,exist_ok=False)
     report = dict(passed=False,action=action,steps=steps if action in ('close','open') else None,
                   hold_seconds=hold_seconds,port=port,baud=baud,device_id=device_id,
+                  acceleration=acceleration,speed=speed,
                   trained_policy_commands_sent=0,franka_commands_sent=0)
     try:
         with device,(output/'trace.jsonl').open('x') as trace:
+            if action != 'status':
+                # Full-range manual moves are explicitly authorized. Derive
+                # both travel bounds from the connected hardware; other tools
+                # retain the driver's smaller commissioning defaults.
+                span = device.limits['max_raw']-device.limits['min_raw']
+                device.config = replace(device.config,max_step_raw=span,session_radius_raw=span)
+                report['manual_travel_limits_raw'] = dict(max_step_raw=span,session_radius_raw=span)
             def record(phase, sample):
                 trace.write(json.dumps(dict(phase=phase,sample=asdict(sample)))+'\n')
                 trace.flush()
@@ -67,17 +78,22 @@ def run(action='status', *, steps=12, position=None, hold_seconds=0.,
             print(f'当前位置 {initial.position_raw}，使能 {int(initial.torque_enabled)}，'
                   f'实测电流 {initial.current_a:.4f} A',flush=True)
             if action != 'status':
-                # Reject impossible/large targets before any actuator write.
+                # Reject hardware/operator position violations before arming.
                 device._check_position_target(_target(action,initial.position_raw,steps,position,device.limits))
                 armed = device.arm()
                 record('armed',armed)
                 report['armed'] = asdict(armed)
+                report['profile_acceleration_raw'] = device._read(device.table.profile_acceleration,4)
+                report['profile_velocity_raw'] = device._read(device.table.profile_velocity,4)
+                print(f'运动参数：速度 {report["profile_velocity_raw"]} raw，'
+                      f'加速度 {report["profile_acceleration_raw"]} raw',flush=True)
                 target = _target(action,armed.position_raw,steps,position,device.limits)
                 report['target_raw'] = target
-                print(f'发送目标位置 {target}（相对使能后实测位置 {target-armed.position_raw:+d} 个计数）',flush=True)
+                print(f'准备发送目标位置 {target}（相对使能后实测位置 {target-armed.position_raw:+d} 个计数）',flush=True)
                 proposal = SimpleNamespace(time_ns=time.monotonic_ns(),
                     robotis=(device.closure(target),),normalized=False)
                 receipt = device.command(proposal)
+                print(f'已下发目标位置 {receipt.target_raw}',flush=True)
                 reached = device.wait(receipt,lambda sample:record('moving',sample))
                 report.update(receipt=asdict(receipt),reached=asdict(reached))
                 print(f'已到位：目标 {target}，实测 {reached.position_raw}',flush=True)
@@ -114,9 +130,13 @@ def run(action='status', *, steps=12, position=None, hold_seconds=0.,
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=('status','close','open','move'),nargs='?',default='status')
-    parser.add_argument('--steps',type=int,default=12,help='close/open relative counts, 1..20; default 12')
-    parser.add_argument('--position',type=int,help='move absolute encoder position; at most 20 counts away')
+    parser.add_argument('--steps',type=int,default=12,help='close/open positive relative counts; target must stay within position limits; default 12')
+    parser.add_argument('--position',type=int,help='move to an absolute encoder position within hardware/operator limits')
     parser.add_argument('--hold-seconds',type=float,default=0.,help='Keep torque on after arrival for 0..30 seconds, then disable')
+    parser.add_argument('--acceleration',choices=('max','low'),default='max',
+                        help='max: use device Acceleration Limit for the RAM profile; low: use raw 1')
+    parser.add_argument('--speed',choices=('max','low'),default='max',
+                        help='max: use device Velocity Limit for the RAM profile; low: use 0.57 rpm')
     parser.add_argument('--port',default='/dev/ttyUSB0')
     parser.add_argument('--baud',type=int,default=2_000_000)
     parser.add_argument('--device-id',type=int,default=1)

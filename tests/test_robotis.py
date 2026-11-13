@@ -126,6 +126,91 @@ class RobotisTests(unittest.TestCase):
                 [t.profile_acceleration,t.goal_current,t.profile_velocity,t.goal_position,t.torque,t.goal_position])
             self.assertTrue(all(isinstance(value,int) for _,value in packet.log))
 
+    def test_max_acceleration_uses_device_limit_without_changing_eeprom_and_restores(self):
+        for model in TABLES:
+            t=TABLES[model]
+            packet=FakePacket(model)
+            packet.values[t.acceleration_limit]=37
+            packet.values[t.profile_acceleration]=9
+            mock,device,packet=self.session(packet,allow_motion=True,use_max_acceleration=True)
+            with mock,device:
+                device.arm()
+                self.assertEqual(packet.values[t.profile_acceleration],37)
+                self.assertEqual(packet.log[0],(t.profile_acceleration,37))
+                self.assertEqual(packet.values[t.acceleration_limit],37)
+                self.assertNotIn(t.acceleration_limit,[address for address,_ in packet.log])
+            self.assertEqual(packet.values[t.profile_acceleration],9)
+            self.assertEqual(packet.values[t.torque],0)
+
+    def test_max_velocity_uses_device_limit_for_both_models_and_restores(self):
+        for model in TABLES:
+            t=TABLES[model]
+            packet=FakePacket(model)
+            packet.values[t.velocity_limit]=17
+            packet.values[t.profile_velocity]=3
+            mock,device,packet=self.session(packet,allow_motion=True,use_max_velocity=True)
+            with mock,device:
+                device.arm()
+                self.assertEqual(packet.values[t.profile_velocity],17)
+                self.assertEqual(packet.values[t.velocity_limit],17)
+                self.assertNotIn(t.velocity_limit,[address for address,_ in packet.log])
+            self.assertEqual(packet.values[t.profile_velocity],3)
+            self.assertEqual(packet.values[t.torque],0)
+
+    def test_max_velocity_rejects_zero_limit_instead_of_disabling_profile(self):
+        packet=FakePacket()
+        packet.values[TABLES[35073].velocity_limit]=0
+        mock,device,packet=self.session(packet,allow_motion=True,use_max_velocity=True)
+        with mock,device:
+            with self.assertRaisesRegex(RuntimeError,'limits'):device.arm()
+        self.assertEqual(packet.log,[])
+
+    def test_direct_profile_is_explicit_zero_preloaded_before_enable_and_restored(self):
+        t=TABLES[35073]
+        packet=FakePacket()
+        packet.values[t.profile_velocity]=7
+        packet.values[t.profile_acceleration]=9
+        mock,device,packet=self.session(packet,allow_motion=True,position_profile='direct')
+        with mock,device:
+            device.arm()
+            self.assertEqual(packet.values[t.profile_velocity],0)
+            self.assertEqual(packet.values[t.profile_acceleration],9)
+            self.assertEqual(packet.log[0],(t.goal_position,
+                (503).to_bytes(4,'little')+bytes(4)+(49).to_bytes(2,'little')))
+            self.assertEqual(packet.log[1],(t.torque,1))
+            device.command(self.proposal(504/1150))
+        self.assertEqual(packet.values[t.torque],0)
+        self.assertEqual(packet.values[t.profile_velocity],7)
+        self.assertEqual(packet.values[t.profile_acceleration],9)
+
+    def test_direct_profile_rejects_uncommissioned_model_and_current_mode(self):
+        with self.assertRaises(ValueError):GripperConfig(position_profile='direct',control_mode='current')
+        mock,device,packet=self.session(FakePacket(35074),allow_motion=True,position_profile='direct')
+        with mock,device:
+            with self.assertRaises(RuntimeError):device.arm()
+        self.assertEqual(packet.log,[])
+
+    def test_direct_profile_readback_failure_never_enables_and_restores_parameters(self):
+        t=TABLES[35073]
+        class WrongReadback(FakePacket):
+            def __getattr__(self,name):
+                method=super().__getattr__(name)
+                if name=='read4ByteTxRx':
+                    def read(port,device,address):
+                        if address==t.profile_velocity and self.log:
+                            return 1,0,0
+                        return method(port,device,address)
+                    return read
+                return method
+        packet=WrongReadback()
+        packet.values[t.profile_velocity]=7
+        mock,device,packet=self.session(packet,allow_motion=True,position_profile='direct')
+        with mock,device:
+            with self.assertRaisesRegex(RuntimeError,'confirm direct'):device.arm()
+        self.assertNotIn((t.torque,1),packet.log)
+        self.assertEqual(packet.values[t.torque],0)
+        self.assertEqual(packet.values[t.profile_velocity],7)
+
     def test_low_latency_is_configured_before_ping_and_failure_keeps_reads_available(self):
         for failure in (False,True):
             with self.subTest(failure=failure):

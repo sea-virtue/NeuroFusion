@@ -21,6 +21,8 @@ class EmptyAdvanceTests(unittest.TestCase):
         self.assertEqual(a.task,b.task)
         self.assertEqual(a.direction,b.direction)
         self.assertAlmostEqual(a.task_confidence,b.task_confidence,places=5)
+        self.assertIsNotNone(a.slide_probability)
+        self.assertAlmostEqual(a.slide_probability,b.slide_probability,places=5)
         self.assertAlmostEqual(a.direction_confidence,b.direction_confidence,places=5)
         for x,y in zip(self.fast.state[0],self.reference.state[0]):
             torch.testing.assert_close(x,y,rtol=0,atol=0)

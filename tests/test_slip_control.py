@@ -13,13 +13,51 @@ from unittest.mock import patch
 from neurofusion.control.slip import (SlipConfig,SlipController,SlipPrediction,
                                      GripperFeedback,GripperCommand)
 from neurofusion.control.session import Episode,bc_rows
-from neurofusion.control.__main__ import replay,demo_rows
+from neurofusion.control.__main__ import replay,demo_rows,stream
 
 
 BASE = 1_000_000_000
 
 
 class SlipTests(unittest.TestCase):
+    def test_fifteen_second_quarter_second_search_reserves_sixty_counts(self):
+        cfg=SlipConfig(grip_closure=327/1150,grip_settle_seconds=0.,release_timeout=15.,
+                       open_step=1/1150,open_step_interval=.25,max_open_delta=60/1150,
+                       max_tracking_delta=16/1150,gripper_session_radius_raw=70)
+        controller=SlipController(cfg)
+        closure=cfg.grip_closure
+        opening_goals=[]
+        phase_at_timeout=None
+        for t in range(0,15060,10):
+            now=BASE+t*1_000_000
+            prediction=SlipPrediction(t,now,now,'quiet','up',.99,.99)
+            decision=controller.step(now,GripperFeedback(now,closure),prediction)
+            if decision['command']:
+                closure=decision['command']['closure']
+            if decision['phase']=='OPENING':
+                raw=round(closure*1150)
+                if not opening_goals or opening_goals[-1][1]!=raw:
+                    opening_goals.append((t,raw))
+            if t==15000:phase_at_timeout=decision['phase']
+        self.assertEqual(len(opening_goals),60)
+        self.assertEqual(opening_goals[0],(0,326))
+        self.assertEqual(opening_goals[-1],(14750,267))
+        self.assertEqual(phase_at_timeout,'BRAKING')
+        self.assertEqual(round(closure*1150),327)
+        self.assertEqual(controller.reason,'no_slide_timeout')
+
+    def test_stream_passes_explicit_session_radius_to_driver(self):
+        cfg=SlipConfig(grip_closure=327/1150,max_open_delta=60/1150,gripper_session_radius_raw=70)
+        with tempfile.TemporaryDirectory() as root,patch('neurofusion.adapters.robotis.RobotisGripper') as factory:
+            factory.return_value.__enter__.side_effect=RuntimeError('stop before device access')
+            with self.assertRaisesRegex(RuntimeError,'stop before device access'):
+                stream(cfg,Path(root)/'session',execute=True)
+            self.assertEqual(factory.call_args.args[0].session_radius_raw,70)
+
+    def test_session_radius_requires_positive_integer(self):
+        for value in (0,-1,True,70.5):
+            with self.assertRaises(ValueError):SlipConfig(grip_closure=.3,gripper_session_radius_raw=value)
+
     def setUp(self):
         ceiling = patch('neurofusion.adapters.robotis.load_position_ceiling',return_value=None)
         ceiling.start()

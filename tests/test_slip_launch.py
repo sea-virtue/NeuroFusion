@@ -19,16 +19,27 @@ from neurofusion.control.slip import SlipConfig
 class LaunchTests(unittest.TestCase):
     def test_commands_set_rates_without_changing_control_configuration(self):
         args=SimpleNamespace(checkpoint=Path('model.pt'),window_ms=1,clock_hz=100.,
-                             poll_ms=.25,control_hz=100.,shadow=False)
-        config=SlipConfig(grip_closure=.44)
+                             poll_ms=.25,control_hz=100.,shadow=False,position_profile='direct')
+        config=SlipConfig(grip_closure=.44,slide_confirm_frames=3,confidence=.6)
         original=asdict(config)
         source,control=build_commands(args,Path('run'),config)
         self.assertEqual(source[source.index('--window-ms')+1],'1')
         self.assertEqual(control[control.index('--control-hz')+1],'100.0')
         self.assertIn('--execute',control)
+        self.assertEqual(source[source.index('--slide-confirm-frames')+1],'3')
+        self.assertEqual(source[source.index('--slide-confidence')+1],'0.6')
+        self.assertEqual(control[control.index('--position-profile')+1],'direct')
         args.shadow=True
         self.assertNotIn('--execute',build_commands(args,Path('run'),config)[1])
         self.assertEqual(asdict(config),original)
+
+    def test_separate_slide_probability_threshold_is_forwarded_without_lowering_other_confidence(self):
+        args=SimpleNamespace(checkpoint=Path('model.pt'),window_ms=1,clock_hz=100.,
+                             poll_ms=.25,control_hz=100.,shadow=False,position_profile='direct')
+        config=SlipConfig(grip_closure=.3,confidence=.6,slide_probability_threshold=.35)
+        source,_=build_commands(args,Path('run'),config)
+        self.assertEqual(source[source.index('--slide-confidence')+1],'0.35')
+        self.assertEqual(config.confidence,.6)
 
     def test_stop_requests_sdk_cleanup_before_any_forceful_termination(self):
         process=Mock()

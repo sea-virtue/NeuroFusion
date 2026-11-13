@@ -11,6 +11,7 @@ import sys
 import time
 
 import numpy as np
+from .slip import SlideConfirmation
 
 
 class EventWindows:
@@ -93,6 +94,10 @@ def main():
     parser.add_argument('--threads', type=int, default=2)
     parser.add_argument('--clock-hz', type=float, default=100.)
     parser.add_argument('--poll-ms', type=float, default=2.)
+    parser.add_argument('--slide-confirm-frames', type=int, default=1)
+    parser.add_argument('--slide-confidence', type=float, default=.8,
+                        help='Threshold for P(slide), independent of the winning class')
+    parser.add_argument('--max-prediction-age', type=float, default=.15)
     parser.add_argument('--output', required=True, type=Path, help='New diagnostic directory, exclusive creation')
     args = parser.parse_args()
     if not np.isfinite(args.seconds) or args.seconds < 0 or args.threads < 1:
@@ -105,6 +110,7 @@ def main():
     torch.set_num_threads(args.threads)
     recognizer = SNNRecognizer(args.checkpoint, expected_direction=args.expected_direction)
     windows = EventWindows(recognizer.bin_us, args.window_ms * 1000)
+    confirmation = SlideConfirmation(args.slide_confirm_frames,args.slide_confidence,args.max_prediction_age)
     # Warm kernels before opening hardware; actual recurrent state starts fresh.
     recognizer.predict([], 0, windows.window_us, time.monotonic_ns())
     recognizer.reset()
@@ -117,6 +123,8 @@ def main():
                   time_semantics='Shared FPGA power-measurement/DVS counter closes windows with 10 ms device lag; captured_ns is watermark host receipt, not exposure. Late events fail closed.',
                   clock_source='Speck board measurement timestamp',requested_clock_hz=args.clock_hz,clock_lag_us=10_000,
                   requested_inference_hz=1000/args.window_ms,poll_ms=args.poll_ms,
+                  slide_confirm_frames=args.slide_confirm_frames,slide_confidence=args.slide_confidence,
+                  slide_decision='P(slide) >= threshold; consecutive native windows; latched before coalescing',
                   recording_kind='Event/classification diagnostic only; not a complete dual-camera BC episode')
     started = time.monotonic()
     latencies = []
@@ -141,6 +149,7 @@ def main():
                 for values, begin, end, captured in windows.ready():
                     before = time.monotonic_ns()
                     prediction = recognizer.predict(values, begin, end, captured)
+                    prediction = confirmation.observe(prediction,begin,end,windows.watermark_us)
                     latencies.append((time.monotonic_ns() - before) / 1e6)
                     raw.write(json.dumps(dict(events=values.tolist(), start_us=begin, end_us=end,
                                               captured_host_ns=captured)) + '\n')
@@ -149,7 +158,9 @@ def main():
                     report['windows_processed'] += 1
                 # Sparse events can close many historical windows at once.
                 # Advance all recurrent state, but publish only the newest one:
-                # never present a catch-up burst as independent live evidence.
+                # never present a catch-up burst as independent host arrivals.
+                # Confirm native windows before coalescing; retain the original
+                # evidence time so later quiet cannot erase or refresh it.
                 if newest is not None:
                     report['intermediate_windows_not_published'] += ready_count - 1
                     if newest.available_ns - newest.captured_ns > 150_000_000:

@@ -42,7 +42,7 @@ def demo_rows(config):
         yield {'now_ns':now,'feedback':asdict(GripperFeedback(now,closure)),'snn':asdict(prediction)}
 
 
-def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_recording=None, control_hz=100.):
+def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_recording=None, control_hz=100., position_profile='bounded'):
     """Periodic watchdog independent of stdin arrival. Stdin never supplies feedback.
 
     Input predictions must originate on this host monotonic clock. Any stream
@@ -86,13 +86,15 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
     episode = Episode(output,config,synthetic=False,tactile_recording=tactile_recording,
                       metadata={'execution':'robotis' if execute else 'live_shadow',
                                 'snn_input':'host_clock_stdin_jsonl','physical_stop_verified':False,
-                                'requested_control_hz':control_hz})
+                                'requested_control_hz':control_hz,'position_profile':position_profile})
     try:
-        with RobotisGripper(GripperConfig(port=port,allow_motion=execute)) as device:
+        with RobotisGripper(GripperConfig(port=port,allow_motion=execute,position_profile=position_profile,
+                                        session_radius_raw=config.gripper_session_radius_raw)) as device:
             episode.manifest['metadata'].update(
                 measured_position_ceiling_raw=getattr(device,'position_ceiling_raw',None),
                 command_position_ceiling_raw=getattr(device,'command_ceiling_raw',None),
-                driver_limits=getattr(device,'limits',None))
+                driver_limits=getattr(device,'limits',None),
+                gripper_session_radius_raw=config.gripper_session_radius_raw)
             episode.save()
             # Arm only after an initial fresh classification. Never enable before
             # there is a usable SNN heartbeat or automatically clear motion hold.
@@ -111,8 +113,11 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
                 scale = device.limits['max_raw']-device.limits['min_raw']
                 if config.max_tracking_delta*scale > device.config.max_step_raw:
                     raise ValueError('Tracking bound exceeds driver per-command bound')
-                if abs(config.grip_closure*scale+device.limits['min_raw']-sample.position_raw)+config.max_open_delta*scale > device.config.session_radius_raw:
-                    raise ValueError('Episode would exceed current driver commissioning range')
+                required_range = abs(config.grip_closure*scale+device.limits['min_raw']-sample.position_raw)+config.max_open_delta*scale
+                if required_range > device.config.session_radius_raw:
+                    raise ValueError(f'Episode requires {required_range:g} counts from measured position '
+                                     f'{sample.position_raw}, exceeding configured gripper_session_radius_raw='
+                                     f'{device.config.session_radius_raw}; check grip_closure and release range')
                 device.arm()
             next_tick = time.monotonic()
             deadline = next_tick+config.release_timeout*2+config.slide_seconds+config.brake_timeout+5
@@ -168,6 +173,7 @@ def main():
     parser.add_argument('--port',default='/dev/ttyUSB0')
     parser.add_argument('--tactile-recording',type=Path)
     parser.add_argument('--control-hz',type=float,default=100.)
+    parser.add_argument('--position-profile',choices=('bounded','direct'),default='bounded')
     args = parser.parse_args()
     config = SlipConfig(**json.loads(args.config.read_text()))
     if args.mode != 'stream' and args.execute: parser.error('--execute is only valid in stream mode')
@@ -178,7 +184,7 @@ def main():
             phase = replay(config,(json.loads(line) for line in handle),args.output)
     else:
         phase = stream(config,args.output,execute=args.execute,port=args.port,tactile_recording=args.tactile_recording,
-                       control_hz=args.control_hz)
+                       control_hz=args.control_hz,position_profile=args.position_profile)
     print(json.dumps({'phase':phase,'output':str(args.output),'hardware_execution_requested':args.execute}))
     return 0 if phase == 'FINISHED' else 1
 

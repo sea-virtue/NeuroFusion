@@ -9,13 +9,15 @@
   "max_feedback_age": 0.15,
   "max_tick_gap": 0.1,
   "grip_settle_seconds": 0.06,
-  "release_timeout": 6.0,
+  "release_timeout": 10.0,
   "brake_timeout": 0.8,
   "open_rate": 0.01,
   "close_rate": 0.03,
-  "max_open_delta": 0.006956521739130435,
+  "max_open_delta": 0.08217391304347826,
   "max_tracking_delta": 0.01391304347826087,
   "arrival_tolerance": 0.0026086956521739132,
   "open_step": 0.0008695652173913044,
-  "open_step_interval": 0.5
+  "open_step_interval": 0.25,
+  "slide_confirm_frames": 3,
+  "slide_probability_threshold": 0.20
 }

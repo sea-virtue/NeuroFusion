@@ -1,0 +1,181 @@
+{
+  "date": "2026-11-13",
+  "baseline_commit": "f420702",
+  "scope": "Archive of current code and configuration snapshot, focused software checks, and selected previous hardware/offline evidence. No new hardware operation for this commit.",
+  "software": {
+    "tests_run": 127,
+    "successful": true,
+    "failures": 0,
+    "errors": 0,
+    "not_run": [
+      {
+        "test": "test_robotis.RobotisTests.test_current_feedback_cannot_be_reported_as_executed_position",
+        "reason": "torchvision is not installed in the minimal live environment"
+      },
+      {
+        "test": "test_robotis.RobotisTests.test_measured_feedback_preserves_arm_fields_and_requires_fresh_arrival",
+        "reason": "torchvision is not installed in the minimal live environment"
+      }
+    ],
+    "counts": {
+      "test_slide_confirmation.py": 13,
+      "test_slip_control.py": 25,
+      "test_slip_launch.py": 6,
+      "test_live_slip.py": 9,
+      "test_speck_watermark.py": 3,
+      "test_snn_empty_advance.py": 3,
+      "test_gripper*.py": 26,
+      "test_robotis.py": 31,
+      "test_capture.py": 11
+    },
+    "environment": {
+      "OMP_NUM_THREADS": 2,
+      "MKL_NUM_THREADS": 2
+    },
+    "scope": "Focused software regression only; no cameras, serial ports, or hardware motion. Full model/training suite not run."
+  },
+  "current_paperbox": {
+    "snapshot": "configs/slip-catch-paperbox.example.json",
+    "settings": {
+      "grip_closure": 0.2843478260869565,
+      "slide_seconds": 0,
+      "close_delay_seconds": 0.0,
+      "expected_direction": "up",
+      "confidence": 0.6,
+      "confirm_seconds": 0,
+      "max_prediction_age": 0.15,
+      "max_feedback_age": 0.15,
+      "max_tick_gap": 0.1,
+      "grip_settle_seconds": 0.06,
+      "release_timeout": 6.0,
+      "brake_timeout": 0.8,
+      "open_rate": 0.01,
+      "close_rate": 0.03,
+      "max_open_delta": 0.010434782608695653,
+      "max_tracking_delta": 0.01391304347826087,
+      "arrival_tolerance": 0.0026086956521739132,
+      "open_step": 0.0008695652173913044,
+      "open_step_interval": 0.5,
+      "slide_probability_threshold": 0.6,
+      "slide_confirm_frames": 1,
+      "gripper_session_radius_raw": 25
+    },
+    "grip_raw": 327,
+    "most_open_target_raw": 315,
+    "open_counts": 12
+  },
+  "features": [
+    "Independent P(slide) threshold, separate from winning task confidence",
+    "Consecutive native-window confirmation, latched before coalescing and retaining original evidence age",
+    "Explicit RN direct motion profile for closed-loop launcher",
+    "Manual velocity/acceleration use device limits; restore RAM parameters on exit",
+    "Manual full hardware travel range while preserving operator position ceilings",
+    "Configurable closed-loop session radius and clearer preflight errors",
+    "scripts/local ignored; formal regression tests tracked"
+  ],
+  "one_count_hardware_test": {
+    "phase_sequence": [
+      "GRIPPING",
+      "OPENING",
+      "BRAKING",
+      "FAULT"
+    ],
+    "goal_sequence": [
+      562,
+      561,
+      562
+    ],
+    "measured_position_range": [
+      561,
+      564
+    ],
+    "max_abs_current_a": 0.15276,
+    "reason": "no_slide_timeout",
+    "motion_profile": "direct",
+    "snn_tasks": [
+      "quiet"
+    ],
+    "commands_with_evidence": 0,
+    "scope": "One-count live closed-loop motor-profile test; no detected slide; timeout return is not a slip-catch success.",
+    "after": {
+      "host_ns": 91013058777727,
+      "position_raw": 562,
+      "closure": 0.48869565217391303,
+      "velocity_raw": 0,
+      "current_a": 0.0,
+      "voltage_v": 23.6,
+      "temperature_c": 37,
+      "moving": false,
+      "torque_enabled": false,
+      "hardware_error": 0,
+      "goal_position_raw": 562,
+      "timestamp_basis": "host_receipt_proxy",
+      "operating_mode": 5,
+      "goal_current_a": 3.2964
+    },
+    "restored_profile_velocity_raw": 0,
+    "restored_profile_acceleration_raw": 0
+  },
+  "offline_probability_audit": {
+    "run": "outputs/slip-catch-20261113-172004-wd1gxajg",
+    "native_windows": 10427,
+    "events": 177,
+    "task_counts": {
+      "quiet": 10354,
+      "slide": 73
+    },
+    "peak": {
+      "sequence": 7054,
+      "time_s": 6.927498428,
+      "device_time_s": 7.054,
+      "start_us": 7083000,
+      "end_us": 7084000,
+      "captured_host_ns": 109555073192707,
+      "events": 4,
+      "task": "slide",
+      "p_quiet": 0.41586244106292725,
+      "p_slide": 0.5431375503540039,
+      "p_rotate": 0.03975794091820717,
+      "p_escape_wriggle": 0.0012420470593497157
+    },
+    "replay_check": {
+      "published_predictions_compared": 1037,
+      "max_probability_error": 0.0,
+      "label_mismatches": 0
+    },
+    "scope": "Offline re-inference from all saved native windows using the original checkpoint. No hardware actions."
+  },
+  "later_probability_audit": {
+    "scope": "Offline audit of all saved native windows; no hardware actions",
+    "run": "outputs/slip-catch-20261113-174035-__tr281l",
+    "native_windows": 10333,
+    "events": 53,
+    "task_counts": {
+      "quiet": 10333
+    },
+    "peak": {
+      "slide_probability": 0.013891096226871014,
+      "time_s": 7.307580071,
+      "task": "quiet"
+    },
+    "longest_streak_at_035": 0,
+    "reason": "no_slide_timeout"
+  },
+  "known_issues": [
+    {
+      "issue": "Ctrl+C shutdown torque-off readback confirmation failed once",
+      "run": "outputs/slip-catch-20261113-162159-nbgflrq8",
+      "status": "Unresolved; subsequent independent connection read torque disabled three times. No fix claimed in this archive."
+    },
+    {
+      "issue": "Episode manifest can be marked finished before device context cleanup completes",
+      "status": "Check run.json and terminal errors; FINISHED is not proof of shutdown success."
+    }
+  ],
+  "limitations": [
+    "Physical object retention and task success rates have not been validated.",
+    "Recorded online prediction publication near 100 Hz does not imply 1000 Hz fresh host arrivals.",
+    "Raw recordings, local configuration, temporary scripts, environments, and external analysis notes are not included in Git.",
+    "Exploratory slip-catch-search.example.json retains user tuning and is not the current paperbox snapshot; its release range can exceed the default session budget."
+  ]
+}

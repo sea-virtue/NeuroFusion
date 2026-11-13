@@ -18,9 +18,13 @@ def build_commands(args, output, config):
                  '--checkpoint', str(args.checkpoint), '--expected-direction', config.expected_direction,
                  '--seconds', '0', '--window-ms', str(args.window_ms),
                  '--clock-hz', str(args.clock_hz), '--poll-ms', str(args.poll_ms),
+                 '--slide-confirm-frames',str(config.slide_confirm_frames),
+                 '--slide-confidence',str(config.slide_threshold),
+                 '--max-prediction-age',str(config.max_prediction_age),
                  '--output', str(output/'events')]
     controller = [sys.executable, '-m', 'neurofusion.control', 'stream',
                   '--config', str(output/'config.json'), '--control-hz', str(args.control_hz),
+                  '--position-profile',args.position_profile,
                   '--output', str(output/'control')]
     if not args.shadow:
         controller.append('--execute')
@@ -56,6 +60,8 @@ def main():
     parser.add_argument('--clock-hz', type=float, default=100.)
     parser.add_argument('--poll-ms', type=float, default=.25)
     parser.add_argument('--control-hz', type=float, default=100.)
+    parser.add_argument('--position-profile',choices=('bounded','direct'),default='direct',
+                        help='direct uses RN Profile Velocity=0; bounded restores the slower commissioning profile')
     parser.add_argument('--shadow', action='store_true', help='Read feedback without enabling torque or sending targets')
     parser.add_argument('--dry-run', action='store_true', help='Show commands without opening devices or creating output')
     args = parser.parse_args()
@@ -90,6 +96,7 @@ def main():
     publisher,controller = build_commands(args,output,config)
     report = dict(status='starting',config_source=str(args.config),shadow=args.shadow,
                   requested_inference_hz=1000/args.window_ms,requested_control_hz=args.control_hz,
+                  position_profile=args.position_profile,
                   publisher_command=publisher,controller_command=controller)
     def save():
         (output/'run.json').write_text(json.dumps(report,indent=2)+'\n')

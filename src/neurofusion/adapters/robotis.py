@@ -117,10 +117,17 @@ class GripperConfig:
     # Mode 5: resolve the ceiling from the device's existing Current Limit.
     # Mode 0 retains the explicit, bounded signed-current commissioning cap.
     use_hardware_current_limit: bool = True
+    # Explicit streaming-position opt-in; manual tools retain bounded profiles.
+    position_profile: str = 'bounded'
+    # RAM profile only; never raise the EEPROM Acceleration Limit.
+    use_max_acceleration: bool = False
+    use_max_velocity: bool = False
 
     def __post_init__(self):
         if self.control_mode not in OPERATING_MODES:
             raise ValueError('control_mode must be position or current')
+        if self.position_profile not in ('bounded','direct') or (self.position_profile == 'direct' and self.control_mode != 'position'):
+            raise ValueError('direct position profile requires position control')
         if not self.port or type(self.device_id) is not int or not 0 <= self.device_id <= 252:
             raise ValueError('An explicit serial port and unicast device ID are required')
         for key in ('baud','max_step_raw','session_radius_raw','tolerance_raw'):
@@ -131,6 +138,10 @@ class GripperConfig:
                 raise ValueError(f'{key} must be finite and positive')
         if type(self.use_hardware_current_limit) is not bool:
             raise ValueError('use_hardware_current_limit must be boolean')
+        if type(self.use_max_acceleration) is not bool:
+            raise ValueError('use_max_acceleration must be boolean')
+        if type(self.use_max_velocity) is not bool:
+            raise ValueError('use_max_velocity must be boolean')
         if (self.current_cap_a > .3 and (self.control_mode != 'position' or
                 not self.use_hardware_current_limit)) or self.velocity_rpm > 1.:
             raise ValueError('Explicit commissioning cap supports at most .3A and 1rpm; position mode may use the device current limit')
@@ -346,8 +357,9 @@ class RobotisGripper:
             raise ValueError('Position outside hardware limits')
         if not 0 < current_raw <= self.limits['current_raw']:
             raise ValueError('Position control requires a positive current ceiling')
-        if not 0 < velocity_raw <= self.limits['velocity_raw']:
-            raise ValueError('Position control requires a positive bounded profile velocity')
+        direct = self.config.position_profile == 'direct' and self.model_number == 35073
+        if not (velocity_raw == 0 if direct else 0 < velocity_raw <= self.limits['velocity_raw']):
+            raise ValueError('Profile velocity must match the explicit bounded or direct position profile')
         t = self.table
         if self.model_number == 35073:
             data = (position.to_bytes(4,'little',signed=True)
@@ -413,6 +425,8 @@ class RobotisGripper:
             raise RuntimeError(f'USB low-latency setup failed; motion not started: {self.usb_low_latency_error}')
         self.limits['mode'] = self._read(11,1)
         self._require_mode(self.config.control_mode)
+        if self.config.position_profile == 'direct' and self.model_number != 35073:
+            raise RuntimeError('Direct profile has only been commissioned for RH-P12-RN model 35073')
         if self.position_ceiling_raw is not None and self.config.control_mode != 'position':
             raise RuntimeError('Operator position boundary requires position mode; current-mode motion is blocked')
         if self.limits['return_level'] != 2:
@@ -430,13 +444,25 @@ class RobotisGripper:
         current = min(self.limits['current_raw'],_raw_magnitude(self.config.current_cap_a,t.current_unit_a))
         velocity_unit = .114 if self.model_number == 35073 else .01
         velocity = min(self.limits['velocity_raw'],max(1,_raw_magnitude(self.config.velocity_rpm,velocity_unit)))
+        if self.config.use_max_velocity:
+            velocity = self.limits['velocity_raw']
+        direct = self.config.position_profile == 'direct'
+        if direct: velocity = 0
         if current <= 0 or (self.config.control_mode == 'position' and
-                (velocity <= 0 or self.limits['acceleration_raw'] <= 0)):
+                not direct and (velocity <= 0 or self.limits['acceleration_raw'] <= 0)):
             raise RuntimeError('Invalid current/velocity/acceleration limits')
         self._motion_started = True  # cleanup even if a WRITE reply is lost
         if self.config.control_mode == 'position':
-            self._write(t.profile_acceleration,4,1)
+            if not direct:
+                acceleration = self.limits['acceleration_raw'] if self.config.use_max_acceleration else 1
+                self._write(t.profile_acceleration,4,acceleration)
+                if self._read(t.profile_acceleration,4) != acceleration:
+                    raise RuntimeError('Position profile acceleration readback mismatch before enabling torque')
             self._write_position_profile(preload,current,velocity)
+            if direct and self._read(t.profile_velocity,4) != 0:
+                raise RuntimeError('Could not confirm direct Profile Velocity=0 before enabling torque')
+            if not direct and self.config.use_max_velocity and self._read(t.profile_velocity,4) != velocity:
+                raise RuntimeError('Could not confirm maximum profile velocity before enabling torque')
         else:
             # A nonzero Mode 0 preload would start driving as soon as torque is on.
             self._write(t.goal_current,2,0)

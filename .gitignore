@@ -35,3 +35,6 @@ third_party/*/
 /scripts/run-live-inputs.ps1
 /scripts/run-tactile-capture.ps1
 /docs/minist-cpu-verified.txt
+
+# Personal scratch scripts; keep formal regression tests in tests/ tracked.
+/scripts/local/

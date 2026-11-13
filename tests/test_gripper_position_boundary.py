@@ -12,6 +12,23 @@ from test_robotis import FakePacket, FakePort
 
 
 class PositionBoundaryTests(unittest.TestCase):
+    def test_direct_profile_preserves_both_target_and_feedback_boundaries(self):
+        packet=FakePacket()
+        sdk=SimpleNamespace(PortHandler=FakePort,PacketHandler=lambda protocol:packet)
+        with patch.dict('sys.modules',{'dynamixel_sdk':sdk}),patch(
+                'neurofusion.adapters.robotis.load_position_ceiling',return_value=PositionBoundary(516,510)),patch(
+                'neurofusion.adapters.robotis.motion_inhibit_reason',return_value=None):
+            with RobotisGripper(GripperConfig(allow_motion=True,position_profile='direct')) as device:
+                device.arm()
+                before=list(packet.log)
+                with self.assertRaises(ValueError):
+                    device.command(SimpleNamespace(time_ns=time.monotonic_ns(),robotis=(511/1150,),normalized=False))
+                self.assertEqual(packet.log,before)
+                packet.values[611]=517
+                with self.assertRaisesRegex(RuntimeError,'tightening boundary'):
+                    device.command(SimpleNamespace(time_ns=time.monotonic_ns(),robotis=(510/1150,),normalized=False))
+            self.assertEqual(packet.values[562],0)
+
     def test_interrupted_sdk_read_does_not_leave_torque_enabled(self):
         class BusyPacket(FakePacket):
             def __getattr__(self,name):

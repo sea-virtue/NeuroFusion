@@ -1,5 +1,5 @@
-"""Causal ruler slip catch; zero slide_seconds recloses on first detection."""
-from dataclasses import dataclass, asdict
+"""Causal ruler slip catch with optional consecutive-window confirmation."""
+from dataclasses import dataclass, asdict, replace
 import math
 
 
@@ -16,7 +16,11 @@ class SlipConfig:
     close_delay_seconds: float = 0.
     expected_direction: str = 'down'
     confidence: float = .8
+    # Immediate catch uses P(slide), independent of the winning task label.
+    # None falls back to confidence for existing configurations.
+    slide_probability_threshold: float | None = None
     confirm_seconds: float = 0.
+    slide_confirm_frames: int = 1
     max_prediction_age: float = .15
     max_feedback_age: float = .15
     max_tick_gap: float = .1
@@ -32,6 +36,8 @@ class SlipConfig:
     # None preserves continuous opening for legacy timed configurations.
     open_step: float | None = None
     open_step_interval: float = .5
+    # Raw encoder counts around the armed position, including initial grip.
+    gripper_session_radius_raw: int = 25
 
     def __post_init__(self):
         if not math.isfinite(self.grip_closure) or not 0 < self.grip_closure <= 1:
@@ -40,6 +46,13 @@ class SlipConfig:
             raise ValueError('Map the physical downward axis to an SNN direction explicitly')
         if not 0 < self.confidence <= 1:
             raise ValueError('confidence must be in (0,1]')
+        if self.slide_probability_threshold is not None and (
+                not math.isfinite(self.slide_probability_threshold) or not 0 < self.slide_probability_threshold <= 1):
+            raise ValueError('slide_probability_threshold must be in (0,1]')
+        if type(self.slide_confirm_frames) is not int or self.slide_confirm_frames < 1:
+            raise ValueError('slide_confirm_frames must be a positive integer')
+        if type(self.gripper_session_radius_raw) is not int or self.gripper_session_radius_raw < 1:
+            raise ValueError('gripper_session_radius_raw must be a positive integer')
         for name in ('max_prediction_age','max_feedback_age','max_tick_gap',
                      'release_timeout','brake_timeout','open_rate','close_rate','max_open_delta',
                      'max_tracking_delta','arrival_tolerance'):
@@ -58,6 +71,32 @@ class SlipConfig:
             if self.open_step > min(self.max_open_delta,self.max_tracking_delta):
                 raise ValueError('Opening step exceeds release or tracking bound')
 
+    @property
+    def slide_threshold(self):
+        return self.confidence if self.slide_probability_threshold is None else self.slide_probability_threshold
+
+
+@dataclass(frozen=True)
+class SlideEvidence:
+    """A latched run of distinct contiguous source windows, before coalescing."""
+    first_sequence: int
+    last_sequence: int
+    first_available_ns: int
+    available_ns: int
+    captured_ns: int
+    frames: int
+    confidence: float
+
+    def __post_init__(self):
+        for value in (self.first_sequence,self.last_sequence,self.first_available_ns,
+                      self.available_ns,self.captured_ns,self.frames):
+            if type(value) is not int or value < 0:
+                raise ValueError('Slide evidence requires nonnegative integer counters and times')
+        if (self.frames < 1 or self.last_sequence-self.first_sequence+1 != self.frames or
+                not self.captured_ns <= self.available_ns or self.first_available_ns > self.available_ns or
+                not math.isfinite(self.confidence) or not 0 <= self.confidence <= 1):
+            raise ValueError('Invalid contiguous slide evidence')
+
 
 @dataclass(frozen=True)
 class SlipPrediction:
@@ -69,6 +108,8 @@ class SlipPrediction:
     task_confidence: float
     direction_confidence: float
     model_id: str | None = None
+    slide_evidence: SlideEvidence | None = None
+    slide_probability: float | None = None
 
     def __post_init__(self):
         if self.task not in ('quiet','slide','rotate','escape_wriggle'):
@@ -81,6 +122,65 @@ class SlipPrediction:
             raise ValueError('Prediction cannot be available before its source')
         if not all(math.isfinite(v) and 0 <= v <= 1 for v in (self.task_confidence,self.direction_confidence)):
             raise ValueError('Invalid classification confidence')
+        if self.slide_probability is not None and (
+                not math.isfinite(self.slide_probability) or not 0 <= self.slide_probability <= 1):
+            raise ValueError('Invalid slide probability')
+        if isinstance(self.slide_evidence,dict):
+            object.__setattr__(self,'slide_evidence',SlideEvidence(**self.slide_evidence))
+        if self.slide_evidence is not None:
+            evidence = self.slide_evidence
+            if (not isinstance(evidence,SlideEvidence) or evidence.last_sequence > self.sequence or
+                    evidence.available_ns > self.available_ns):
+                raise ValueError('Slide evidence cannot come from a future prediction')
+
+    @property
+    def slide_score(self):
+        if self.slide_probability is not None:
+            return self.slide_probability
+        # Legacy inputs only record the winner's confidence. A quiet winner's
+        # probability must never be interpreted as P(slide).
+        return self.task_confidence if self.task == 'slide' else 0.
+
+
+class SlideConfirmation:
+    """Latch before dropping intermediate predictions; quiet cannot erase a catch.
+
+    Host timestamps may be identical within a USB batch. Contiguity is checked
+    with source window edges and sequence IDs, never repeated control ticks.
+    Old catch-up windows cannot establish new evidence as if they were live.
+    """
+    def __init__(self, frames, confidence, max_age):
+        if type(frames) is not int or frames < 1 or not 0 < confidence <= 1:
+            raise ValueError('Positive confirmation count and confidence required')
+        positive(max_age,'max_age')
+        self.frames,self.confidence,self.max_age = frames,confidence,max_age
+        self.first = self.previous = self.end_us = None
+        self.count,self.minimum = 0,1.
+        self.evidence = None
+
+    def observe(self, prediction, start_us, end_us, watermark_us):
+        if not start_us < end_us <= watermark_us:
+            raise ValueError('Closed source window and watermark required')
+        if self.evidence is None:
+            qualified = (prediction.slide_score >= self.confidence
+                         and watermark_us-end_us <= self.max_age*1e6
+                         and prediction.available_ns-prediction.captured_ns <= self.max_age*1e9)
+            contiguous = (self.previous is not None and self.end_us == start_us
+                          and prediction.sequence == self.previous.sequence+1
+                          and prediction.model_id == self.previous.model_id)
+            if not qualified:
+                self.count,self.first = 0,None
+            else:
+                if not contiguous or not self.count:
+                    self.count,self.first,self.minimum = 0,prediction,1.
+                self.count += 1
+                self.minimum = min(self.minimum,prediction.slide_score)
+                if self.count >= self.frames:
+                    self.evidence = SlideEvidence(
+                        self.first.sequence,prediction.sequence,self.first.available_ns,
+                        prediction.available_ns,prediction.captured_ns,self.count,self.minimum)
+            self.previous,self.end_us = prediction,end_us
+        return replace(prediction,slide_evidence=self.evidence)
 
 
 @dataclass(frozen=True)
@@ -116,8 +216,8 @@ class GripperCommand:
 class SlipController:
     """One controller per episode. Caller supplies periodic monotonic ticks.
 
-    Zero slide_seconds catches the first fresh slide task without another timer
-    or direction gate. Timed mode confirms distinct predictions and keeps its
+    Zero slide_seconds catches confirmed fresh slide windows without another
+    timer or direction gate. Timed mode confirms distinct predictions and keeps its
     timer running through quiet gaps. Faults never resume opening.
     """
     terminal = ('FINISHED','FAULT')
@@ -134,6 +234,7 @@ class SlipController:
         self.target = None
         self.revision = 0
         self.last_open_step_ns = None
+        self.slide_streak = 0
 
     def _phase(self, phase, now):
         self.phase, self.phase_ns, self.stable_ns = phase,now,None
@@ -165,6 +266,7 @@ class SlipController:
         if not fresh:
             self._brake(now_ns,'stale_or_missing_snn')
         new = False
+        previous_sequence = self.last_sequence
         if fresh and prediction.sequence != self.last_sequence:
             if prediction.sequence < self.last_sequence or prediction.captured_ns <= self.last_capture_ns:
                 self._brake(now_ns,'snn_sequence_or_time_reversed')
@@ -175,11 +277,18 @@ class SlipController:
                          and prediction.direction_confidence >= c.confidence)
         downward = qualified and prediction.direction == c.expected_direction
         if new and self.phase in ('GRIPPING','OPENING','SLIDING'):
-            if c.slide_seconds == 0 and prediction.task == 'slide' and prediction.task_confidence >= c.confidence:
-                # Catch on the first new task detection, regardless of the
-                # uncalibrated image/world direction. No SLIDING timer phase.
-                self.onset_ns = prediction.available_ns
-                self._brake(now_ns)
+            if c.slide_seconds == 0:
+                slide = prediction.slide_score >= c.slide_threshold
+                self.slide_streak = (self.slide_streak+1 if prediction.sequence == previous_sequence+1 else 1) if slide else 0
+                evidence = prediction.slide_evidence
+                confirmed = bool(evidence and evidence.frames >= c.slide_confirm_frames
+                                 and evidence.confidence >= c.slide_threshold
+                                 and (now_ns-evidence.captured_ns)/1e9 <= c.max_prediction_age)
+                if confirmed or self.slide_streak >= c.slide_confirm_frames:
+                    self.onset_ns = evidence.available_ns if confirmed else prediction.available_ns
+                    self._brake(now_ns)
+                elif prediction.task in ('rotate','escape_wriggle') and prediction.task_confidence >= c.confidence:
+                    self._brake(now_ns,'unexpected_contact_motion')
             elif qualified and not downward:
                 self._brake(now_ns,'unexpected_slide_direction')
             elif prediction.task in ('rotate','escape_wriggle') and prediction.task_confidence >= c.confidence:
@@ -198,7 +307,7 @@ class SlipController:
             if (now_ns-self.phase_ns)/1e9 > c.release_timeout:
                 self._brake(now_ns,'grip_timeout')
         if self.phase == 'OPENING':
-            if new:
+            if new and c.slide_seconds > 0:
                 if downward:
                     if self.candidate_ns is None: self.candidate_ns = prediction.available_ns
                     if (prediction.available_ns-self.candidate_ns)/1e9 >= c.confirm_seconds:

@@ -60,7 +60,8 @@ class SNNRecognizer:
         self.state,self.end_us = state,end_us
         self.sequence += 1
         return SlipPrediction(self.sequence,time.monotonic_ns(),captured_host_ns,
-                              self.tasks[ti],self.directions[di],float(tp[ti]),float(dp[di]),self.model_id)
+                              self.tasks[ti],self.directions[di],float(tp[ti]),float(dp[di]),self.model_id,
+                              slide_probability=float(tp[self.tasks.index('slide')]))
 
 
 def main():

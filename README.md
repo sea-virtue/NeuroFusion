@@ -14,6 +14,8 @@ bash /home/diaohh/neurofusion/neurofusion/scripts/slip-catch.sh
 
 默认100 Hz控制、1 ms推理窗口，本机只读实测分类发布约99.47 Hz。`--dry-run`检查命令，`--shadow`读取设备但不发送运动目标。换机环境、配置模板、代码结构和验证范围见[开发说明 v1](docs/development.md)，控制流程见[滑移控制说明](docs/slip-teacher.md)。
 
+2026-11-13：已加入独立滑动概率门限、可配置连续窗口确认与锁存、direct运动profile和手动最大速度/加速度设置。当前纸盒参数归档于 `configs/slip-catch-paperbox.example.json`（327→315、6秒、0.5秒间隔、60%单窗触发）；脚本实际读取被忽略的 `slip-catch-search.local.json`。已有真实动作和滑动分类触发回夹日志，物体保持成功率及Ctrl+C退出确认问题仍待验证，见[开发说明](docs/development.md)。
+
 核心设计：RGB 编码后缓存任务上下文 `c`；GelSight 新帧、GelNeuro 事件包、机器人状态及已执行动作，通过确定顺序更新同一份接触记忆 `h`；控制时刻独立读取最新状态，经统一动作头生成动作提案。
 
 ## 早期合成演示（历史入口）
