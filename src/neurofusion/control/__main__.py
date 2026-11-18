@@ -1,6 +1,6 @@
 """Replay a slip teacher or consume host-timestamped SNN JSONL on stdin."""
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
 import math
 from pathlib import Path
@@ -10,9 +10,21 @@ import threading
 import time
 from .slip import SlipConfig, SlipController, SlipPrediction, GripperFeedback
 from .session import Episode
+from .config import CountSlipConfig, parse_slip_config
 
 
-def replay(config, rows, output, *, synthetic=False):
+def replay(config, rows, output, *, synthetic=False, gripper_limits=None):
+    if isinstance(config,CountSlipConfig):
+        if gripper_limits is None:
+            raise ValueError('Count-based replay requires --gripper-limits from the recorded driver_limits')
+        rows = iter(rows)
+        try: first = next(rows)
+        except StopIteration: raise ValueError('Replay has no feedback for the startup reference')
+        import itertools
+        startup = round(gripper_limits['min_raw']+first['feedback']['closure']*
+                        (gripper_limits['max_raw']-gripper_limits['min_raw']))
+        config = config.resolve(gripper_limits,startup)
+        rows = itertools.chain((first,),rows)
     controller = SlipController(config)
     episode = Episode(output,config,synthetic=synthetic,
                       metadata={'execution':'replay_shadow','hardware_commands_sent':0})
@@ -42,7 +54,7 @@ def demo_rows(config):
         yield {'now_ns':now,'feedback':asdict(GripperFeedback(now,closure)),'snn':asdict(prediction)}
 
 
-def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_recording=None, control_hz=100., position_profile='bounded'):
+def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_recording=None, control_hz=100., position_profile='bounded', grip_from_current=None):
     """Periodic watchdog independent of stdin arrival. Stdin never supplies feedback.
 
     Input predictions must originate on this host monotonic clock. Any stream
@@ -51,6 +63,8 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
     """
     if not math.isfinite(control_hz) or control_hz <= 0:
         raise ValueError('control_hz must be finite and positive')
+    if isinstance(config,CountSlipConfig):
+        config.uses_current_position(grip_from_current)
     period = 1./control_hz
     from ..adapters.robotis import RobotisGripper, GripperConfig
     messages = queue.Queue(maxsize=64)
@@ -82,7 +96,8 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
                 break
         return None if overflow.is_set() else current
 
-    controller,latest = SlipController(config),None
+    requested_config = config
+    controller,latest = None,None
     episode = Episode(output,config,synthetic=False,tactile_recording=tactile_recording,
                       metadata={'execution':'robotis' if execute else 'live_shadow',
                                 'snn_input':'host_clock_stdin_jsonl','physical_stop_verified':False,
@@ -107,8 +122,31 @@ def stream(config, output, *, execute=False, port='/dev/ttyUSB0', tactile_record
             if (not isinstance(latest,SlipPrediction) or latest.available_ns > now or
                     not 0 <= now-latest.captured_ns <= config.max_prediction_age*1e9):
                 raise RuntimeError('No fresh initial SNN prediction')
-            if execute:
+            if execute or grip_from_current or isinstance(config,CountSlipConfig):
                 sample = device.read()
+            if isinstance(config,CountSlipConfig):
+                device._healthy(sample)
+                use_current = config.uses_current_position(grip_from_current)
+                config = config.resolve(device.limits,sample.position_raw,grip_from_current=grip_from_current)
+                episode.manifest['metadata'].update(
+                    requested_config=asdict(requested_config),
+                    grip_reference='startup_feedback' if use_current else 'configured_encoder_count',
+                    startup_position_raw=sample.position_raw)
+            elif grip_from_current:
+                device._healthy(sample)
+                configured_grip = config.grip_closure
+                config = replace(config,grip_closure=sample.closure)
+                episode.manifest['metadata'].update(
+                    grip_reference='startup_feedback',startup_position_raw=sample.position_raw,
+                    configured_grip_closure=configured_grip)
+            controller = SlipController(config)
+            episode.manifest['config'] = asdict(config)
+            episode.save()
+            if grip_from_current or isinstance(requested_config,CountSlipConfig):
+                scale = device.limits['max_raw']-device.limits['min_raw']
+                print(f'本轮夹持/回夹基准：{device.raw_position(config.grip_closure)}；'
+                      f'最多松开 {config.max_open_delta*scale:g} 个计数。',flush=True)
+            if execute:
                 device._check_position_target(device.raw_position(config.grip_closure))
                 scale = device.limits['max_raw']-device.limits['min_raw']
                 if config.max_tracking_delta*scale > device.config.max_step_raw:
@@ -174,17 +212,28 @@ def main():
     parser.add_argument('--tactile-recording',type=Path)
     parser.add_argument('--control-hz',type=float,default=100.)
     parser.add_argument('--position-profile',choices=('bounded','direct'),default='bounded')
+    parser.add_argument('--grip-from-current',action=argparse.BooleanOptionalAction,default=None,
+                        help='Use measured startup position for the grip and reclose reference')
+    parser.add_argument('--gripper-limits',type=Path,
+                        help='JSON containing min_raw/max_raw, or a recorded control/manifest.json, for replay')
     args = parser.parse_args()
-    config = SlipConfig(**json.loads(args.config.read_text()))
+    config = parse_slip_config(json.loads(args.config.read_text()))
     if args.mode != 'stream' and args.execute: parser.error('--execute is only valid in stream mode')
-    if args.mode == 'demo': phase = replay(config,demo_rows(config),args.output,synthetic=True)
+    if args.mode == 'demo':
+        if isinstance(config,CountSlipConfig):
+            parser.error('demo fixture needs a resolved fractional config from control/manifest.json')
+        phase = replay(config,demo_rows(config),args.output,synthetic=True)
     elif args.mode == 'replay':
         if args.input is None: parser.error('replay requires --input')
         with args.input.open() as handle:
-            phase = replay(config,(json.loads(line) for line in handle),args.output)
+            limits = json.loads(args.gripper_limits.read_text()) if args.gripper_limits else None
+            if limits and 'metadata' in limits:
+                limits = limits['metadata']['driver_limits']
+            phase = replay(config,(json.loads(line) for line in handle),args.output,gripper_limits=limits)
     else:
         phase = stream(config,args.output,execute=args.execute,port=args.port,tactile_recording=args.tactile_recording,
-                       control_hz=args.control_hz,position_profile=args.position_profile)
+                       control_hz=args.control_hz,position_profile=args.position_profile,
+                       grip_from_current=args.grip_from_current)
     print(json.dumps({'phase':phase,'output':str(args.output),'hardware_execution_requested':args.execute}))
     return 0 if phase == 'FINISHED' else 1
 

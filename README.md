@@ -4,6 +4,12 @@
 
 # NeuroFusion
 
+Speck 片上骨干部署入口：`bash scripts/speck-deploy.sh --help`。导出、部署、恢复和事件速率说明见 [部署文档](docs/speck-on-chip.md)。
+
+使用片上模型的重抓取入口（实际运动）：`bash scripts/slip-catch-chip.sh`。操作和频率实测见 [片上重抓取说明](docs/slip-catch-chip.md)。
+
+重抓取调参直接编辑 `configs/slip-catch-search.local.json`：使用编码计数、秒和百分比；当前最多松40计数，超时和会话范围自动推导。[配置字段说明](docs/slip-catch-chip.md#直接使用计数和秒调参)。
+
 本机代码目录：`/home/diaohh/neurofusion/neurofusion`。已实现可训练主机链、双触觉采集与独立夹爪SNN闭环；完整多模态策略的实机任务训练和验收仍待完成。
 
 当前独立夹爪一行启动（会实际运动）：

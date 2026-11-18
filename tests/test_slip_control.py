@@ -14,12 +14,104 @@ from neurofusion.control.slip import (SlipConfig,SlipController,SlipPrediction,
                                      GripperFeedback,GripperCommand)
 from neurofusion.control.session import Episode,bc_rows
 from neurofusion.control.__main__ import replay,demo_rows,stream
+from neurofusion.control.config import CountSlipConfig
 
 
 BASE = 1_000_000_000
 
 
 class SlipTests(unittest.TestCase):
+    def test_stream_uses_startup_feedback_and_keeps_prearm_range_checks(self):
+        import threading
+        from neurofusion.adapters.robotis import GripperSample,GripperReceipt
+
+        class Device:
+            def __init__(self,driver_config,raw):
+                self.config=driver_config
+                self.limits={'min_raw':0,'max_raw':1150}
+                self.position_raw=raw
+                self.origin_raw=raw
+                self.armed=False
+                self.targets=[]
+            def __enter__(self): return self
+            def __exit__(self,*args): pass
+            def read(self):
+                return GripperSample(time.monotonic_ns(),self.position_raw,self.position_raw/1150,
+                                     0,0.,23.,43,False,self.armed,0,self.position_raw)
+            def _healthy(self,sample): pass
+            def _check_position_target(self,target): pass
+            def raw_position(self,closure): return round(closure*1150)
+            def arm(self): self.armed=True
+            def command(self,command):
+                target=self.raw_position(command.closure)
+                if abs(target-self.position_raw)>self.config.max_step_raw:
+                    raise ValueError('Fake driver: per-command range exceeded')
+                if abs(target-self.origin_raw)>self.config.session_radius_raw:
+                    raise ValueError('Fake driver: session range exceeded')
+                self.targets.append(target)
+                self.position_raw=target
+                now=time.monotonic_ns()
+                return GripperReceipt(now,now,target,target/1150)
+
+        # The old fixed reference reproduces the user's 28-count failure.
+        # Measured references must not bypass the original 25-count bound.
+        cases=((197,True,12,None),(213,True,12,None),
+               (197,False,12,'Episode requires 28 counts'),
+               (197,True,26,'Episode requires 26 counts'),
+               (8,True,12,'Invalid release or tracking range'),
+               (197,None,40,None),(35,None,40,'hardware lower limit'))
+        for raw,use_current,release,error in cases:
+            with self.subTest(raw=raw,current=use_current,release=release):
+                finished=threading.Event()
+                class Input:
+                    def __iter__(self):
+                        now=time.monotonic_ns()
+                        yield json.dumps(dict(sequence=1,available_ns=now,captured_ns=now,
+                                              task='quiet',direction='up',task_confidence=.99,
+                                              direction_confidence=.99,slide_probability=.01))
+                        finished.wait(2.)
+                devices=[]
+                def factory(driver_config):
+                    device=Device(driver_config,raw)
+                    devices.append(device)
+                    return device
+                cfg=SlipConfig(grip_closure=213/1150,slide_seconds=0.,grip_settle_seconds=0.,
+                               release_timeout=.05,brake_timeout=.1,max_prediction_age=1.,
+                               open_step=1/1150,open_step_interval=.005,
+                               max_open_delta=release/1150,max_tracking_delta=16/1150)
+                if use_current is None:
+                    cfg=CountSlipConfig(max_open_counts=release,open_step_interval_s=.001,
+                                        extra_observation_s=.01,grip_settle_ms=0.,
+                                        max_prediction_age_ms=1000.,brake_timeout_s=.1)
+                with tempfile.TemporaryDirectory() as root,patch('sys.stdin',Input()),patch(
+                        'neurofusion.adapters.robotis.RobotisGripper',side_effect=factory):
+                    output=Path(root)/'session'
+                    try:
+                        if error:
+                            with self.assertRaisesRegex(ValueError,error):
+                                stream(cfg,output,execute=True,control_hz=1000.,grip_from_current=use_current)
+                            self.assertFalse(devices[0].armed)
+                            self.assertEqual(devices[0].targets,[])
+                        else:
+                            phase=stream(cfg,output,execute=True,control_hz=1000.,grip_from_current=use_current)
+                            self.assertEqual(phase,'FAULT')
+                            device=devices[0]
+                            self.assertLess(min(device.targets),raw)
+                            self.assertGreaterEqual(min(device.targets),raw-release)
+                            self.assertLessEqual(max(device.targets),raw)
+                            self.assertEqual(device.targets[-1],raw)
+                            manifest=json.loads((output/'manifest.json').read_text())
+                            self.assertEqual(manifest['config']['grip_closure'],raw/1150)
+                            self.assertEqual(manifest['metadata']['startup_position_raw'],raw)
+                            self.assertEqual(manifest['error'],'no_slide_timeout')
+                            if isinstance(cfg,CountSlipConfig):
+                                self.assertEqual(manifest['metadata']['requested_config']['max_open_counts'],40)
+                                self.assertEqual(manifest['metadata']['gripper_session_radius_raw'],45)
+                            else:
+                                self.assertEqual(cfg.grip_closure,213/1150)
+                    finally:
+                        finished.set()
+
     def test_fifteen_second_quarter_second_search_reserves_sixty_counts(self):
         cfg=SlipConfig(grip_closure=327/1150,grip_settle_seconds=0.,release_timeout=15.,
                        open_step=1/1150,open_step_interval=.25,max_open_delta=60/1150,

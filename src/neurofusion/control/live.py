@@ -6,6 +6,7 @@ It uses the hardware clock, not a host-time extrapolation or a repeated label.
 from dataclasses import asdict
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -88,6 +89,8 @@ class EventWindows:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--checkpoint', required=True, type=Path)
+    parser.add_argument('--backend',choices=('cpu','chip'),default='cpu')
+    parser.add_argument('--chip-config',type=Path)
     parser.add_argument('--expected-direction', required=True, choices=('up', 'down', 'left', 'right'))
     parser.add_argument('--seconds', type=float, default=10., help='0 runs until Ctrl+C')
     parser.add_argument('--window-ms', type=int, default=20)
@@ -105,10 +108,19 @@ def main():
     if not np.isfinite(args.clock_hz) or not 0 < args.clock_hz <= 100 or not np.isfinite(args.poll_ms) or args.poll_ms <= 0:
         parser.error('clock-hz must be in (0,100] Hz; poll-ms must be finite and positive')
     import torch
-    from ..adapters.live_devices import SpeckSource
-    from .snn import SNNRecognizer
     torch.set_num_threads(args.threads)
-    recognizer = SNNRecognizer(args.checkpoint, expected_direction=args.expected_direction)
+    if args.backend == 'chip':
+        if args.chip_config is None or not args.chip_config.is_file():
+            parser.error('chip backend requires an exported --chip-config')
+        from ..adapters.speck_chip import SpeckChipSource
+        from .chip_readout import ChipReadout
+        recognizer = ChipReadout(args.checkpoint,expected_direction=args.expected_direction)
+        source_context = SpeckChipSource(args.chip_config,args.checkpoint,clock_hz=args.clock_hz)
+    else:
+        from ..adapters.live_devices import SpeckSource
+        from .snn import SNNRecognizer
+        recognizer = SNNRecognizer(args.checkpoint, expected_direction=args.expected_direction)
+        source_context = SpeckSource(clock_hz=args.clock_hz)
     windows = EventWindows(recognizer.bin_us, args.window_ms * 1000)
     confirmation = SlideConfirmation(args.slide_confirm_frames,args.slide_confidence,args.max_prediction_age)
     # Warm kernels before opening hardware; actual recurrent state starts fresh.
@@ -126,13 +138,25 @@ def main():
                   slide_confirm_frames=args.slide_confirm_frames,slide_confidence=args.slide_confidence,
                   slide_decision='P(slide) >= threshold; consecutive native windows; latched before coalescing',
                   recording_kind='Event/classification diagnostic only; not a complete dual-camera BC episode')
+    report.update(backend=args.backend,motor_commands_sent=0,
+                  input_kind='chip_output_spikes_feature_0_to_15_in_column_x' if args.backend=='chip' else 'raw_dvs',
+                  cpu_backbone_executed=args.backend=='cpu')
+    if args.backend == 'chip':
+        report.update(chip_config=str(args.chip_config),hardware_commands_sent=None,
+                      chip_configuration_applied=False,
+                      time_semantics='CNN output event timestamps and board power timestamps share the device stopwatch; 10 ms hardware-watermark guard; receipt time is not physical slip onset.',
+                      recording_kind='Chip output spikes and classification diagnostic; not raw DVS or complete BC data')
     started = time.monotonic()
     latencies = []
     prediction_times = []
     try:
         with (args.output / 'event-windows.jsonl').open('x') as raw, (
-                args.output / 'predictions.jsonl').open('x') as predictions, SpeckSource(clock_hz=args.clock_hz) as source:
+                args.output / 'predictions.jsonl').open('x') as predictions, source_context as source:
             report['actual_clock_hz'] = source.actual_clock_hz
+            if args.backend == 'chip':
+                report.update(chip_configuration_applied=True,output_core=source.output_core,
+                              chip_config_sha256=source.config_id)
+                (args.output/'chip-applied.json').write_text(source.applied_json)
             _, startup = source.read()
             report['startup_events_excluded'] = len(startup)
             started = last_prediction = time.monotonic()
@@ -178,6 +202,12 @@ def main():
             if not report['predictions']:
                 raise RuntimeError('No complete real event window received')
         report['status'] = 'complete'
+    except BrokenPipeError:
+        # The controller can finish before the publisher; still restore the
+        # device and avoid a second stdout flush error during Python shutdown.
+        report['status'] = 'consumer_closed'
+        with open(os.devnull,'w') as sink:
+            os.dup2(sink.fileno(),sys.stdout.fileno())
     except KeyboardInterrupt:
         report['status'] = 'interrupted'
     except BaseException as exc:
@@ -194,7 +224,7 @@ def main():
             report['prediction_gap_ms']=dict(median=float(np.median(gaps)),p95=float(np.percentile(gaps,95)),maximum=float(gaps.max()))
         (args.output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report), file=sys.stderr, flush=True)
-    return 0 if report['status'] == 'complete' else 1
+    return 0 if report['status'] in ('complete','consumer_closed') else 1
 
 
 if __name__ == '__main__':

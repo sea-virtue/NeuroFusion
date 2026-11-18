@@ -1,5 +1,7 @@
 # 独立夹爪闭环开发说明 v1
 
+2026-11-18 更新：[片上入口与可读计数配置](slip-catch-chip.md)。本机默认配置为启动实测参考、最多松40计数、每0.5秒1计数；自动计算23秒超时和45计数会话范围。CPU和片上入口均可读新格式。下文的327→315纸盒参数与原始CPU链路为2026-11-13历史记录。部署细节见[Speck片上说明](speck-on-chip.md)。
+
 更新：2026-11-13。本文记录 Speck 事件相机、CPU SNN 分类与 ROBOTIS 夹爪的独立闭环；不依赖 Franka，不要求片上部署。详细操作见 [滑移控制说明](slip-teacher.md)，当天硬件排查见 [实机记录](tactile-live-check-20261112.md)。
 
 当前归档包含独立P(slide)门限、按原生窗口计数的确认与锁存、可配置闭环会话范围、direct运动profile，以及手动工具最大速度/加速度和完整位置范围。纸盒参数另存为 `configs/slip-catch-paperbox.example.json`；本机 `.local.json`、临时脚本、原始日志与差异分析继续保留在Git外。当天精简验证与已知问题见[2026-11-13验证摘要](validation/slip-catch-20261113.json)。
@@ -70,8 +72,8 @@ Speck USB3 / Samna
 | 配置 | 用途 |
 | --- | --- |
 | `configs/slip-teacher.example.json` | 通用软件夹具，不能视为实机夹持标定 |
-| `configs/slip-catch-paperbox.example.json` | 当前纸盒参数快照，夹持327、最多松12计数、6秒、60%单窗 |
-| `configs/slip-catch-search.example.json` | 另行调参的探索示例，按文件实际数值使用，未覆盖为纸盒参数 |
+| `configs/slip-catch-paperbox.example.json` | 历史纸盒参数快照，夹持327、最多松12计数、6秒、60%单窗 |
+| `configs/slip-catch-search.example.json` | 当前可读计数模板，实测起点、最多松40计数、自动推导超时与范围 |
 | `configs/gripper-position-limits.example.json` | 本机位置边界参考：目标最高562、实测容许575 |
 | `configs/slip-catch-search.local.json` | 启动脚本实际读取的本机控制配置 |
 | `configs/gripper-position-limits.local.json` | 驱动自动读取的本机位置边界 |
@@ -79,7 +81,7 @@ Speck USB3 / Samna
 `*.local.json`被Git忽略，推送不会携带这些文件。新检出且本地文件不存在时，可以从模板创建，再按实际硬件核对或重新标定；已有本地文件不要覆盖：
 
 ```bash
-cp configs/slip-catch-paperbox.example.json configs/slip-catch-search.local.json
+cp configs/slip-catch-search.example.json configs/slip-catch-search.local.json
 cp configs/gripper-position-limits.example.json configs/gripper-position-limits.local.json
 ```
 
@@ -126,4 +128,4 @@ bash scripts/slip-catch.sh --dry-run
 
 用户实跑 `slip-catch-20261113-162159-nbgflrq8` 已记录连续3窗slide触发回夹，但Ctrl+C退出时曾出现 `Could not confirm torque off`；随后独立新连接连续3次只读确认使能为0。清理阶段失败的确切根因未确定，本次未修复。`FINISHED`只表示回夹位置序列完成，不能证明退出清理成功；当前manifest也可能在清理前已标为finished，应同时检查run.json和终端报错。
 
-纸盒参数来自本机试验，不是通用标定或抓持成功保证。探索用 `slip-catch-search.example.json` 当前含较大释放范围，可能超过默认25计数会话预算并在使能前被拒绝；它保留用户调参内容，不是本机启动时的默认配置。新检出请优先从纸盒快照复制到local，再核对实际物体与设备。没有完整训练数据、同期双相机BC示教或全项目模型测试验收。
+纸盒历史参数来自本机试验，不是通用标定或抓持成功保证。当前 `slip-catch-search.example.json` 使用可读计数格式，自动按松开行程推导会话范围，恢复本机配置时从该模板创建local。实际执行仍会校验物体起始位置、硬件量程与位置边界。没有完整训练数据、同期双相机BC示教或全项目模型测试验收。

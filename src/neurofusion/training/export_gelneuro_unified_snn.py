@@ -1,5 +1,6 @@
 """Export the trained chip backbone through the official SDK without opening hardware."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -17,9 +18,8 @@ def main():
     p.add_argument("checkpoint",type=Path)
     p.add_argument("--out",type=Path,required=True)
     args=p.parse_args()
-    saved=torch.load(args.checkpoint,map_location="cpu",weights_only=False)
-    model=GelNeuroUnifiedSNN(saved["bin_us"]).eval()
-    model.load_state_dict(saved["model"])
+    saved=torch.load(args.checkpoint,map_location="cpu",weights_only=True)
+    model=GelNeuroUnifiedSNN.from_checkpoint(saved).eval()
     quantized,integer=model.quantized_copy()
     # Use exactly the same integer weights/thresholds evaluated by the trainer.
     sequence=[SumPool2d(4)]
@@ -33,15 +33,22 @@ def main():
     network=DynapcnnNetwork(snn=nn.Sequential(*sequence),input_shape=(2,128,128),
                            dvs_input=True,discretize=False)
     config=network.make_config(device="speck2fmodule",monitor_layers=[-1])
+    config.dvs_layer.pass_sensor_events = True
+    valid, reason = samna.speck2f.validate_configuration(config)
+    if not valid:
+        raise RuntimeError(f"SDK rejected configuration: {reason}")
     args.out.mkdir(parents=True,exist_ok=False)
     (args.out/"speck2f-config.json").write_text(config.to_json())
     # Save effective re-normalized model for offline comparison with exported weights.
     with (args.out/"quantized-model.pt").open("xb") as f:
         torch.save(dict(model=quantized.state_dict(),bin_us=saved["bin_us"],
                         input_gain=1.,integer_layers=integer,
+                        classes=saved['classes'],directions=saved['directions'],
                         native_feature_step_us=saved.get("native_feature_step_us",saved["bin_us"]),
                         host_decoder_calibrated=saved.get("host_decoder_calibrated",False)),f)
     info=dict(checkpoint=str(args.checkpoint.resolve()),sinabs=sinabs.__version__,
+              checkpoint_sha256=hashlib.sha256(args.checkpoint.read_bytes()).hexdigest(),
+              native_feature_step_us=model.bin_us,
               samna=getattr(samna,"__version__","unknown"),
               sdk_valid=True,device="speck2fmodule",memory=model.resource_estimate(),
               sdk_layer_to_core=network._layer2core_map,sdk_memory=network.memory_summary(),

@@ -1,12 +1,14 @@
 # SNN 驱动的一维尺子滑移与即时回夹
 
+2026-11-18 新增 [片上模型重抓取入口](slip-catch-chip.md)：`scripts/slip-catch-chip.sh`，沿用本页的控制策略，改用芯片实际输出。当前独立分类发布实测仍约99 Hz。
+
 当前实现直接使用任务softmax中的P(slide)，由 `slide_probability_threshold`控制即时回夹门限，不要求slide为胜出类别。预测JSON中的 `task`/`task_confidence`仍表示胜出类别及其概率；独立 `slide_probability`才是滑动概率。新阈值省略时回退 `confidence`；旧消息缺少滑动概率时只接受slide胜出类别的置信度。`confidence`另用于其他运动类别和显式计时方式，不能把quiet置信度当作滑动概率。
 
 确认由 `slide_confirm_frames`配置，在发布器遍历全部原生窗口时先确认并锁存，再合并发布最新预测。连续性由源窗口边界和序号检查；重复控制tick不计作新窗口。后续quiet不能取消确认，原始证据时间不被刷新，过期检查仍保留。默认即时方式没有0.5秒滑动计时或额外连续墙钟确认延迟。
 
-本机当前纸盒参数：夹持参考327，6秒未滑超时，每0.5秒松开1计数，最多12计数至315，P(slide)门限0.6，单窗触发，会话范围25。归档快照为 `configs/slip-catch-paperbox.example.json`。Bash脚本实际读取 `configs/slip-catch-search.local.json`，该文件被Git忽略；`slip-catch-search.example.json`是另外调参的探索模板，不替代本机配置。启动脚本默认100 Hz、1 ms窗口、RN型号35073的direct profile（Profile Velocity=0），可传 `--position-profile bounded`回退机械profile。
+2026-11-18 本机配置已改为可读的 `counts-v1`：启动实测位置为参考，每0.5秒松1计数，最多40计数；程序自动推导23秒超时和45计数会话范围。P(slide)门限填写60%，单窗触发。操作与字段说明见[计数配置说明](slip-catch-chip.md#直接使用计数和秒调参)。Bash脚本实际读取 `configs/slip-catch-search.local.json`，该文件被Git忽略；新模板为 `slip-catch-search.example.json`。327→315、6秒、会话范围25的历史纸盒配置保留在 `slip-catch-paperbox.example.json`。启动脚本默认100 Hz、1 ms窗口、RN型号35073的direct profile（Profile Velocity=0），可传 `--position-profile bounded`回退机械profile。
 
-修改持续松开时间和间隔时，还应按“步数×每步计数/1150”同步设置 `max_open_delta`；`gripper_session_radius_raw`须容纳初始位置偏差和总释放量。每条目标跟踪限制仍为20计数，回夹会按实测位置逐次追赶。全局位置标定继续限制命令≤562、反馈≤575；本轮327是物体夹持参考，不会因此把562重新定义为闭合比例1。
+`counts-v1` 的计数到比例换算在执行端读取真实量程后完成；调节总松开量会自动同步超时和会话范围。旧比例格式仍然支持，旧格式用户需自行保持 `max_open_delta` 与 `gripper_session_radius_raw` 一致。控制器跟踪限制默认16计数，驱动单条限制20计数，回夹按实测位置逐次追赶。全局位置标定继续限制命令≤562、反馈≤575；这些边界不重新定义闭合比例1。
 
 滑动概率门限曾试用0.35/3窗，释放范围曾试用15秒/60计数及10秒/20计数，现均不作为纸盒当前参数。实验与回退依据见[当前验证摘要](validation/slip-catch-20261113.json)。这些概率不是已校准的抓持成功率，纸盒和直尺的滑移识别/保持成功率仍待核验。
 

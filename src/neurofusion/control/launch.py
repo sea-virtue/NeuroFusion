@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-from .slip import SlipConfig
+from .config import CountSlipConfig, parse_slip_config
 
 
 def build_commands(args, output, config):
@@ -22,12 +22,18 @@ def build_commands(args, output, config):
                  '--slide-confidence',str(config.slide_threshold),
                  '--max-prediction-age',str(config.max_prediction_age),
                  '--output', str(output/'events')]
+    if getattr(args,'backend','cpu') == 'chip':
+        publisher.extend(['--backend','chip','--chip-config',str(args.chip_config)])
     controller = [sys.executable, '-m', 'neurofusion.control', 'stream',
                   '--config', str(output/'config.json'), '--control-hz', str(args.control_hz),
                   '--position-profile',args.position_profile,
                   '--output', str(output/'control')]
     if not args.shadow:
         controller.append('--execute')
+    if getattr(args,'grip_from_current',False):
+        controller.append('--grip-from-current')
+    elif getattr(args,'grip_from_current',None) is False:
+        controller.append('--no-grip-from-current')
     return publisher,controller
 
 
@@ -56,12 +62,16 @@ def main():
     parser.add_argument('--checkpoint', type=Path,
                         default=root/'artifacts/checkpoints/gelneuro-snn-20261111/final/all-data.pt')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--backend',choices=('cpu','chip'),default='cpu')
+    parser.add_argument('--chip-config',type=Path,default=root/'outputs/speck-chip-model/speck2f-config.json')
     parser.add_argument('--window-ms', type=int, default=1, help='Inference window; actual publication rate also depends on device timestamp delivery')
     parser.add_argument('--clock-hz', type=float, default=100.)
     parser.add_argument('--poll-ms', type=float, default=.25)
     parser.add_argument('--control-hz', type=float, default=100.)
     parser.add_argument('--position-profile',choices=('bounded','direct'),default='direct',
                         help='direct uses RN Profile Velocity=0; bounded restores the slower commissioning profile')
+    parser.add_argument('--grip-from-current',action=argparse.BooleanOptionalAction,default=None,
+                        help='Use measured startup position for the grip and reclose reference')
     parser.add_argument('--shadow', action='store_true', help='Read feedback without enabling torque or sending targets')
     parser.add_argument('--dry-run', action='store_true', help='Show commands without opening devices or creating output')
     args = parser.parse_args()
@@ -74,8 +84,17 @@ def main():
         parser.error('This Speck SDK supports clock-hz at most 100')
     if not args.config.is_file() or not args.checkpoint.is_file():
         parser.error('Local control configuration and checkpoint must exist; see --config and --checkpoint')
+    if args.backend == 'chip' and not args.chip_config.is_file() and not args.dry_run:
+        export_dir = args.chip_config.parent
+        if export_dir.exists():
+            parser.error('Incomplete chip export directory; provide a new --chip-config directory or complete the export')
+        subprocess.run([sys.executable,'-m','neurofusion.training.export_gelneuro_unified_snn',
+                        str(args.checkpoint),'--out',str(export_dir)],cwd=root,check=True)
     settings = json.loads(args.config.read_text())
-    config = SlipConfig(**settings)
+    config = parse_slip_config(settings)
+    if isinstance(config,CountSlipConfig):
+        args.grip_from_current = config.uses_current_position(args.grip_from_current)
+        print(config.describe(grip_from_current=args.grip_from_current),flush=True)
     planned = args.output or root/'outputs/slip-catch-<new-session>'
     if args.dry_run:
         publisher,controller = build_commands(args,planned,config)
@@ -94,7 +113,8 @@ def main():
     if boundary.exists():
         (output/'gripper-position-limits.json').write_bytes(boundary.read_bytes())
     publisher,controller = build_commands(args,output,config)
-    report = dict(status='starting',config_source=str(args.config),shadow=args.shadow,
+    report = dict(status='starting',config_source=str(args.config),shadow=args.shadow,backend=args.backend,
+                  grip_from_current=args.grip_from_current,
                   requested_inference_hz=1000/args.window_ms,requested_control_hz=args.control_hz,
                   position_profile=args.position_profile,
                   publisher_command=publisher,controller_command=controller)
@@ -107,6 +127,8 @@ def main():
     previous = {s:signal.signal(s,request_stop) for s in (signal.SIGINT,signal.SIGTERM)}
     source = consumer = None
     print(f'日志目录：{output}',flush=True)
+    if args.backend == 'chip':
+        print('识别后端：Speck 片上骨干；自动加载配置，使用原分类头和回夹策略。',flush=True)
     print(f'推理窗口 {args.window_ms} ms；夹爪控制 {args.control_hz:g} Hz；'
           f'{"shadow，只读" if args.shadow else "实机运行"}。Ctrl+C结束。',flush=True)
     save()

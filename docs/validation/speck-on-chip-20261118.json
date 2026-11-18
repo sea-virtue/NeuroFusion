@@ -1,0 +1,120 @@
+{
+  "date": "2026-11-18",
+  "status": "hardware_backbone_session_verified",
+  "checkpoint_sha256": "d28753b7bb9494bb6e21bbf32d096421090f473675bddd9e5cc0a44eb65e2ee8",
+  "config_sha256": "c9bcae5e6ba8b7414d3f27a334d4419293e37bc1d3b91e8d436065ab6baf7b49",
+  "runtime": {
+    "python": "3.12.16",
+    "torch": "2.6.0+cpu",
+    "numpy": "2.2.6",
+    "samna": "0.48.6.0",
+    "sinabs": "3.1.3",
+    "tool_dependency_check": "passed"
+  },
+  "sdk_layer_to_core": {
+    "1": 0,
+    "2": 1,
+    "3": 3,
+    "4": 2
+  },
+  "dvs_pool": [
+    4,
+    4
+  ],
+  "sdk_readback_verified": true,
+  "io_sel": {
+    "requested": 0,
+    "actual": 32,
+    "note": "Samna 0.48.6 devkit monitor normalization 0 -> 32 is allowed; all other fields compared exactly"
+  },
+  "self_test": {
+    "synthetic": true,
+    "input_spikes": 20480,
+    "output_spikes": 13872,
+    "passed": true,
+    "scope": "First CNN core through last CNN core; sensor/pool bypassed"
+  },
+  "live": {
+    "seconds": 5.000775042999976,
+    "counts": {
+      "raw_dvs": 5
+    },
+    "note": "Quiet input may yield zero CNN spikes; no accuracy or saturation test"
+  },
+  "on_chip": [
+    "4x4 DVS sum pooling",
+    "four Conv/IAF cores",
+    "16 output channels"
+  ],
+  "host_only": [
+    "four causal EMA traces",
+    "log1p",
+    "task/direction classifier",
+    "slip controller"
+  ],
+  "original_slip_publisher_changed": false,
+  "flash_written": false,
+  "motor_commands_sent": 0,
+  "tests": {
+    "count": 9,
+    "command": "PYTHONPATH=.venv/chip-tools:src .venv/live/bin/python -m unittest discover -s tests -p 'test_speck*.py'",
+    "status": "passed"
+  },
+  "integer_weights_equal_archived_quantized_model": true,
+  "persistence": {
+    "new_sdk_session_dvs": {
+      "value0": {
+        "rawMonitorEnable": false,
+        "monitorEnable": false,
+        "destinations": {
+          "value0": {
+            "layer": 0,
+            "enable": false
+          },
+          "value1": {
+            "layer": 0,
+            "enable": false
+          }
+        },
+        "mirrorDiagonal": false,
+        "merge": false,
+        "onChannel": true,
+        "offChannel": true,
+        "origin": {
+          "x": 0,
+          "y": 0
+        },
+        "pooling": {
+          "x": 1,
+          "y": 1
+        },
+        "cut": {
+          "x": 127,
+          "y": 127
+        },
+        "mirror": {
+          "x": false,
+          "y": false
+        },
+        "passSensorEvents": false
+      }
+    },
+    "new_sdk_session_monitored_cores": [],
+    "interpretation": "New SDK session returns initial defaults. Reapply exported config inside each device-owning inference process; no Flash persistence or independent RAM readback claim."
+  },
+  "limitations": [
+    "Synthetic smoke test bypasses sensor and pooling",
+    "No tactile accuracy or maximum sustained no-loss throughput validation",
+    "No whole-model deployment or chip-output slip-loop integration"
+  ],
+  "evidence": {
+    "export": "outputs/speck-export-20261118/",
+    "deployment": "outputs/speck-deploy-20261118-check4/",
+    "reopen": "outputs/speck-inspect-20261118/"
+  },
+  "failed_attempts_preserved": [
+    "outputs/speck-deploy-20261118/",
+    "outputs/speck-deploy-20261118-check2/",
+    "outputs/speck-deploy-20261118-check3/"
+  ]
+}

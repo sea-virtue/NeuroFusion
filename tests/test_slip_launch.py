@@ -17,6 +17,43 @@ from neurofusion.control.slip import SlipConfig
 
 
 class LaunchTests(unittest.TestCase):
+    def test_current_grip_reference_is_forwarded_only_to_controller(self):
+        args=SimpleNamespace(checkpoint=Path('model.pt'),window_ms=1,clock_hz=100.,
+                             poll_ms=.25,control_hz=100.,shadow=False,position_profile='direct')
+        config=SlipConfig(grip_closure=213/1150)
+        source,fixed=build_commands(args,Path('run'),config)
+        args.grip_from_current=True
+        current_source,current=build_commands(args,Path('run'),config)
+        self.assertEqual(source,current_source)
+        self.assertEqual(current,fixed+['--grip-from-current'])
+
+    def test_chip_entry_uses_current_grip_with_explicit_fixed_reference_override(self):
+        script=Path(__file__).resolve().parents[1]/'scripts/slip-catch-chip.sh'
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            config=root/'config.json';config.write_text(json.dumps(asdict(SlipConfig(grip_closure=213/1150))))
+            checkpoint=root/'checkpoint.pt';checkpoint.touch()
+            for override,expected in (([],True),(['--no-grip-from-current'],False)):
+                with self.subTest(override=override):
+                    config.write_text(json.dumps({'format':'counts-v1',
+                                                  'grip_reference':'current' if expected else 213}))
+                    result=subprocess.run(['bash',str(script),'--dry-run','--config',str(config),
+                                           '--checkpoint',str(checkpoint),*override],
+                                          cwd=root,text=True,capture_output=True,check=True)
+                    self.assertEqual('--grip-from-current' in result.stdout,expected)
+
+    def test_chip_changes_only_publisher_and_preserves_gripper_command(self):
+        args=SimpleNamespace(checkpoint=Path('model.pt'),window_ms=1,clock_hz=100.,
+                             poll_ms=.25,control_hz=100.,shadow=False,position_profile='direct',
+                             backend='cpu',chip_config=Path('chip/speck2f-config.json'))
+        config=SlipConfig(grip_closure=.3)
+        cpu,control=build_commands(args,Path('run'),config)
+        args.backend='chip'
+        chip,chip_control=build_commands(args,Path('run'),config)
+        self.assertEqual(control,chip_control)
+        self.assertEqual(chip[:len(cpu)],cpu)
+        self.assertEqual(chip[len(cpu):],['--backend','chip','--chip-config','chip/speck2f-config.json'])
+
     def test_commands_set_rates_without_changing_control_configuration(self):
         args=SimpleNamespace(checkpoint=Path('model.pt'),window_ms=1,clock_hz=100.,
                              poll_ms=.25,control_hz=100.,shadow=False,position_profile='direct')
