@@ -117,6 +117,23 @@ class RobotisTests(unittest.TestCase):
         self.assertEqual(packet.values[t.goal_current],820)
         self.assertEqual(packet.values[t.profile_velocity],0)
 
+    def test_session_radius_limits_targets_relative_to_initial_position(self):
+        mock, device, packet = self.session(allow_motion=True, session_radius_raw=50, max_step_raw=110)
+        table = TABLES[35073]
+        packet.values[table.present_position] = 74
+        with mock, device:
+            armed = device.arm()
+            self.assertEqual(armed.goal_position_raw, 74)
+            for target in (24, 124):
+                receipt = device.command(self.proposal(device.closure(target)))
+                self.assertEqual(receipt.target_raw, target)
+            writes = list(packet.log)
+            for target in (23, 125):
+                with self.assertRaisesRegex(ValueError, 'exceeds commissioning session range'):
+                    device.command(self.proposal(device.closure(target)))
+            self.assertEqual(packet.log, writes)
+        self.assertEqual(packet.values[table.torque], 0)
+
     def test_rna_preload_uses_its_own_addresses_not_the_legacy_contiguous_block(self):
         mock,device,packet = self.session(FakePacket(35074),allow_motion=True)
         t = TABLES[35074]
@@ -182,6 +199,44 @@ class RobotisTests(unittest.TestCase):
         self.assertEqual(packet.values[t.torque],0)
         self.assertEqual(packet.values[t.profile_velocity],7)
         self.assertEqual(packet.values[t.profile_acceleration],9)
+
+    def test_explicit_current_preload_must_read_back_before_torque_enable(self):
+        t = TABLES[35073]
+
+        class IgnoredCurrentPreload(FakePacket):
+            def writeTxRx(self, port, device, address, size, data):
+                result = super().writeTxRx(port, device, address, size, data)
+                self.values[t.goal_current] = self.values[t.current_limit]
+                return result
+
+        mock, device, packet = self.session(
+            IgnoredCurrentPreload(), allow_motion=True, position_profile='direct',
+            current_cap_a=.20, use_hardware_current_limit=False,
+        )
+        with mock, device:
+            self.assertEqual(device.config.current_cap_a, .20)
+            with self.assertRaisesRegex(RuntimeError, 'Goal Current readback'):
+                device.arm()
+        self.assertNotIn((t.torque, 1), packet.log)
+        self.assertEqual(packet.values[t.torque], 0)
+
+    def test_current_excursion_after_enable_reports_measurement_and_disarms(self):
+        t = TABLES[35073]
+
+        class InrushOnEnable(FakePacket):
+            def write1ByteTxRx(self, port, device, address, value):
+                result = super().__getattr__('write1ByteTxRx')(port, device, address, value)
+                if address == t.torque:
+                    self.values[t.present_current] = 60 if value else 0
+                return result
+
+        mock, device, packet = self.session(InrushOnEnable(), allow_motion=True, position_profile='direct')
+        with self.assertRaisesRegex(RuntimeError, r'\+0\.2412 A.*Goal Current 0\.1970 A.*position 503 raw'):
+            with mock, device:
+                device.arm()
+        self.assertIn((t.torque, 1), packet.log)
+        self.assertEqual(packet.values[t.torque], 0)
+        self.assertEqual(packet.values[t.goal_current], 820)
 
     def test_direct_profile_rejects_uncommissioned_model_and_current_mode(self):
         with self.assertRaises(ValueError):GripperConfig(position_profile='direct',control_mode='current')

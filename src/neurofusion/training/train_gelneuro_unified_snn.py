@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from ..models.gelneuro_unified_snn import GelNeuroUnifiedSNN
 from .augment_gelneuro_temporal import AugmentedRecordings
+from .pressure_labels import PRESSURE_CLASSES, prepare_pressure, split_pressure
 from .train_gelneuro_temporal import configure_device
 from .train_gelneuro_unified import (
     prepare, split, collate, evaluate, classification, CLASSES, DIRECTIONS, IGNORE,
@@ -70,11 +71,46 @@ def aggregate(results):
     return pooled
 
 
+@torch.inference_mode()
+def evaluate_pressure(model, trials, sequences, device):
+    size = len(PRESSURE_CLASSES)
+    confusion = np.zeros((size, size), dtype=int)
+    active_confusion = np.zeros_like(confusion)
+    recordings = {}
+    for trial in trials:
+        values, target, _, _ = sequences[trial.name]
+        tasks, _, _ = model(values.unsqueeze(0).to(device))
+        predicted = tasks[0].argmax(-1).cpu()
+        encoded = target * size + predicted
+        valid = target != IGNORE
+        active = valid & values.flatten(1).any(1)
+        matrix = torch.bincount(encoded[valid], minlength=size ** 2).reshape(size, size).numpy()
+        confusion += matrix
+        active_confusion += torch.bincount(encoded[active], minlength=size ** 2).reshape(size, size).numpy()
+        recordings[trial.name] = classification(matrix, PRESSURE_CLASSES)
+    return {
+        "task": classification(confusion, PRESSURE_CLASSES),
+        "event_bins": classification(active_confusion, PRESSURE_CLASSES),
+        "recordings": recordings,
+    }
+
+
 def run(args, fold, trials, logs, counts):
     device=configure_device(args.device,4)
     torch.manual_seed(args.seed)
-    model=GelNeuroUnifiedSNN(args.bin_ms*1000).to(device)
-    train,heldout=(trials,[]) if fold == -1 else split(trials,fold)
+    pressure = args.pressure_labels is not None
+    classes = PRESSURE_CLASSES if pressure else CLASSES
+    splitter = split_pressure if pressure else split
+    train,heldout=(trials,[]) if fold == -1 else splitter(trials,fold)
+    if args.init_checkpoint:
+        saved = torch.load(args.init_checkpoint, map_location="cpu", weights_only=True)
+        model = GelNeuroUnifiedSNN.from_checkpoint(saved, args.bin_ms * 1000)
+        model.head.reset_parameters()
+    else:
+        model = GelNeuroUnifiedSNN(args.bin_ms * 1000)
+    model.to(device)
+    if pressure:
+        model.pressure_task_count = len(classes)
     if args.resume_root:
         prefix=args.resume_root/(f"fold{fold}" if fold>=0 else "all-data")
         previous=json.loads(prefix.with_suffix(".json").read_text())
@@ -88,8 +124,9 @@ def run(args, fold, trials, logs, counts):
                 weight=conv.weight.abs()
                 conv.weight.copy_(weight*4./weight.sum((1,2,3),keepdim=True).clamp_min(1e-8))
     originals=[logs[t.name] for t in train]
-    target_counts=torch.bincount(torch.cat([y[y>=0] for _,y,_,_ in originals]),minlength=4).float()
-    weights=(target_counts.sum()/(4*target_counts)).to(device)
+    target_counts=torch.bincount(torch.cat([y[y>=0] for _,y,_,_ in originals]),
+                                minlength=len(classes)).float()
+    weights=(target_counts.sum()/(len(classes)*target_counts)).to(device)
     source=originals
     if args.enhanced:
         source=AugmentedRecordings(args.enhanced,train,originals,args.seed,bin_us=args.bin_ms*1000)
@@ -160,15 +197,20 @@ def run(args, fold, trials, logs, counts):
     seconds=time.perf_counter()-started
     model.eval()
     name=f"fold{fold}" if fold>=0 else "all-data"
-    checkpoint=dict(model=model.state_dict(),bin_us=args.bin_ms*1000,kind="unified-iaf-traces",
+    checkpoint=dict(model=model.state_dict(),bin_us=args.bin_ms*1000,
+                    kind="unified-iaf-pressure" if pressure else "unified-iaf-traces",
                     input_gain=model.input_gain,trace_tau_ms=[50,150,500,1500],
-                    classes=CLASSES,directions=DIRECTIONS,config=vars_json(args))
+                    classes=classes,directions=() if pressure else DIRECTIONS,config=vars_json(args))
     with (args.out/f"{name}.pt").open("xb") as f: torch.save(checkpoint,f)
     result=dict(fold=fold,config=vars_json(args),train_trials=[t.name for t in train],
                 heldout_trials=[t.name for t in heldout],seconds=seconds,history=history,
                 memory=model.resource_estimate(),
                 peak_allocated_MiB=torch.cuda.max_memory_allocated()/2**20 if device.type=="cuda" else None)
-    if heldout:
+    if heldout and pressure:
+        result.update(evaluate_pressure(model, heldout, counts, device))
+        print(json.dumps(dict(fold=fold, seconds=seconds, task_f1=result["task"]["macro_f1"],
+                              event_bins_f1=result["event_bins"]["macro_f1"])), flush=True)
+    elif heldout:
         result.update(evaluate(model,heldout,counts,device))
         quantized,quant=model.quantized_copy()
         quantized.eval()
@@ -181,8 +223,9 @@ def run(args, fold, trials, logs, counts):
                              int8_task_f1=qresult["task"]["macro_f1"],int8_direction_f1=qresult["direction"]["macro_f1"])),flush=True)
     else:
         result["scope"]="All-data candidate; no independent validation score"
-        _,quant=model.quantized_copy()
-        with (args.out/f"{name}-integer-parameters.pt").open("xb") as f: torch.save(quant,f)
+        if not pressure:
+            _,quant=model.quantized_copy()
+            with (args.out/f"{name}-integer-parameters.pt").open("xb") as f: torch.save(quant,f)
     (args.out/f"{name}.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
     return result
 
@@ -196,6 +239,8 @@ def main():
     p.add_argument("--data",type=Path,default=Path("data/raw/tactile"))
     p.add_argument("--out",type=Path,required=True)
     p.add_argument("--enhanced",type=Path)
+    p.add_argument("--pressure-labels",type=Path,help="Device-time quiet, press and release intervals")
+    p.add_argument("--init-checkpoint",type=Path,help="Initialize the pressure encoder from a pretrained SNN")
     p.add_argument("--teacher-root",type=Path)
     p.add_argument("--distill",type=float,default=.5)
     p.add_argument("--excitatory-only",action="store_true",help="Nonnegative core weights to reduce bin/event-order mismatch")
@@ -217,7 +262,14 @@ def main():
         p.error("Invalid epoch count or batch size")
     if args.balanced_batches and args.batch_size!=4:
         p.error("Balanced batches currently require batch-size 4")
-    trials,logs=prepare(args.data,args.bin_ms*1000)
+    if args.pressure_labels and (args.balanced_batches or args.teacher_root or args.resume_root):
+        p.error("Pressure intervals use per-bin class weights and a fresh pressure head")
+    if args.init_checkpoint and not args.pressure_labels:
+        p.error("--init-checkpoint requires --pressure-labels")
+    if args.pressure_labels:
+        trials, logs = prepare_pressure(args.data, args.pressure_labels, args.bin_ms * 1000)
+    else:
+        trials,logs=prepare(args.data,args.bin_ms*1000)
     counts={k:(raw_counts(x),t,d,e) for k,(x,t,d,e) in logs.items()}
     print(json.dumps(dict(recordings=len(trials),config=vars_json(args),
                           resource=GelNeuroUnifiedSNN(args.bin_ms*1000).resource_estimate())),flush=True)
@@ -233,11 +285,21 @@ def main():
             present=[args.out/f"fold{f}.json" for f in range(3)]
             if all(path.exists() for path in present):
                 results=[json.loads(path.read_text()) for path in present]
-        pooled=aggregate(results)
-        pooled["int8"]=aggregate([r["int8"] for r in results])
-        pooled["folds"]=[dict(fold=r["fold"],task_f1=r["task"]["macro_f1"],
-                              direction_f1=r["direction"]["macro_f1"],
-                              joint=r["slide_joint_recall"],seconds=r["seconds"]) for r in results]
+        if args.pressure_labels:
+            pooled = {key: classification(np.sum([r[key]["confusion"] for r in results], axis=0),
+                                          PRESSURE_CLASSES)
+                      for key in ("task", "event_bins")}
+            pooled["folds"] = [
+                dict(fold=r["fold"], task_f1=r["task"]["macro_f1"],
+                     event_bins_f1=r["event_bins"]["macro_f1"], seconds=r["seconds"],
+                     heldout_trials=r["heldout_trials"]) for r in results
+            ]
+        else:
+            pooled=aggregate(results)
+            pooled["int8"]=aggregate([r["int8"] for r in results])
+            pooled["folds"]=[dict(fold=r["fold"],task_f1=r["task"]["macro_f1"],
+                                  direction_f1=r["direction"]["macro_f1"],
+                                  joint=r["slide_joint_recall"],seconds=r["seconds"]) for r in results]
         (args.out/"summary.json").write_text(json.dumps(pooled,indent=2),encoding="utf-8")
 
 

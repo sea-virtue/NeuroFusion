@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 outputs/
+/demos/*/models/
 data/raw/
 data/processed/
 checkpoints/

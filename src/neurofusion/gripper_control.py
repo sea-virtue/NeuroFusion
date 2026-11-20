@@ -16,6 +16,19 @@ from types import SimpleNamespace
 from .adapters.robotis import GripperConfig, RobotisGripper
 
 
+def position_config(*, port='/dev/ttyUSB0', baud=2_000_000, device_id=1,
+                    allow_motion=False, acceleration='max', speed='max'):
+    """The position profile shared by the manual entry point and loaded demos."""
+    if acceleration not in ('max','low'):
+        raise ValueError('acceleration must be max or low')
+    if speed not in ('max','low'):
+        raise ValueError('speed must be max or low')
+    return GripperConfig(
+        port=port, baud=baud, device_id=device_id, allow_motion=allow_motion,
+        use_max_acceleration=acceleration == 'max', use_max_velocity=speed == 'max',
+    )
+
+
 def _target(action, origin, steps, position, limits):
     target = position if action == 'move' else origin + (steps if action == 'close' else -steps)
     if not limits['min_raw'] <= target <= limits['max_raw']:
@@ -23,14 +36,22 @@ def _target(action, origin, steps, position, limits):
     return target
 
 
+def command_position(device, target, *, time_ns=None):
+    proposal = SimpleNamespace(
+        time_ns=time.monotonic_ns() if time_ns is None else time_ns,
+        robotis=(device.closure(target),), normalized=False,
+    )
+    return device.command(proposal)
+
+
 def run(action='status', *, steps=12, position=None, hold_seconds=0.,
         port='/dev/ttyUSB0', baud=2_000_000, device_id=1, output=None, acceleration='max',speed='max'):
     if action not in ('status','close','open','move'):
         raise ValueError('Action must be status, close, open, or move')
-    if acceleration not in ('max','low'):
-        raise ValueError('acceleration must be max or low')
-    if speed not in ('max','low'):
-        raise ValueError('speed must be max or low')
+    config = position_config(
+        port=port, baud=baud, device_id=device_id, allow_motion=action != 'status',
+        acceleration=acceleration, speed=speed,
+    )
     if type(steps) is not int or steps < 1:
         raise ValueError('Use a positive integer --steps; steps are encoder counts, not mm')
     if action == 'move' and type(position) is not int:
@@ -41,9 +62,7 @@ def run(action='status', *, steps=12, position=None, hold_seconds=0.,
         raise ValueError('Use 0 <= --hold-seconds <= 30')
     if action == 'status' and hold_seconds:
         raise ValueError('status does not enable torque or hold position')
-    device = RobotisGripper(GripperConfig(
-        port=port,baud=baud,device_id=device_id,allow_motion=action != 'status',
-        use_max_acceleration=acceleration == 'max',use_max_velocity=speed == 'max'))
+    device = RobotisGripper(config)
     if output is None:
         root = Path('outputs/gripper-control')
         root.mkdir(parents=True,exist_ok=True)
@@ -90,9 +109,7 @@ def run(action='status', *, steps=12, position=None, hold_seconds=0.,
                 target = _target(action,armed.position_raw,steps,position,device.limits)
                 report['target_raw'] = target
                 print(f'准备发送目标位置 {target}（相对使能后实测位置 {target-armed.position_raw:+d} 个计数）',flush=True)
-                proposal = SimpleNamespace(time_ns=time.monotonic_ns(),
-                    robotis=(device.closure(target),),normalized=False)
-                receipt = device.command(proposal)
+                receipt = command_position(device, target)
                 print(f'已下发目标位置 {receipt.target_raw}',flush=True)
                 reached = device.wait(receipt,lambda sample:record('moving',sample))
                 report.update(receipt=asdict(receipt),reached=asdict(reached))

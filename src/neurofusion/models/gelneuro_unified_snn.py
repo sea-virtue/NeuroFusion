@@ -114,6 +114,7 @@ class GelNeuroUnifiedSNN(nn.Module):
         for layer in self.convolutions:
             nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
         self.head = nn.Linear(64, 8)
+        self.pressure_task_count = 0
         taus = torch.tensor([50.,150.,500.,1500.])
         self.register_buffer("decay", (-float(bin_us)/1000./taus).exp().reshape(1,4,1))
         self.last_activity = None
@@ -126,6 +127,8 @@ class GelNeuroUnifiedSNN(nn.Module):
             raise ValueError("bin_us must be positive")
         model=cls(dt)
         model.load_state_dict(checkpoint["model"])
+        if checkpoint.get("kind") == "unified-iaf-pressure":
+            model.pressure_task_count = len(checkpoint["classes"])
         model.input_gain=checkpoint.get("input_gain",.25)
         model.decay.copy_((-dt/1000./torch.tensor([50.,150.,500.,1500.])).exp().reshape(1,4,1))
         return model
@@ -152,12 +155,15 @@ class GelNeuroUnifiedSNN(nn.Module):
     def forward(self, counts, state=None, alpha=1.):
         z, state = self.encode(counts,state,alpha)
         logits = self.head(z)
+        if self.pressure_task_count:
+            return logits[..., :self.pressure_task_count], logits[..., :0], state
         return logits[...,:4],logits[...,4:],state
 
     def quantized_copy(self):
         """Joint 8-bit weights/16-bit thresholds; no additional quantization training."""
         result = GelNeuroUnifiedSNN(self.bin_us).to(next(self.parameters()).device)
         result.load_state_dict(self.state_dict())
+        result.pressure_task_count = self.pressure_task_count
         result.input_gain = 1.
         layers = []
         for i, conv in enumerate(result.convolutions):

@@ -10,6 +10,7 @@ import torch
 from torch.utils.data import Dataset
 
 from .gelneuro_data import read_trials
+from .pressure_labels import PRESSURE_INTERVALS, pressure_targets, pressure_trials
 
 
 TIME_SCALES = (0.90, 0.95, 1.00, 1.00, 1.05, 1.10)
@@ -33,6 +34,8 @@ def generate(trial, variant, rng, method, bin_us=100_000):
         begin = origin + offset
         derived = replace(trial, events=trial.events[trial.events[:, 2] >= begin])
         bins, labels, ends = recording_bins(derived, bounds=(begin, last), bin_us=bin_us)
+        if PRESSURE_INTERVALS in derived.labels:
+            labels = pressure_targets(derived, ends, bin_us)
         meta = dict(phase_offset_us=offset, source_events=len(trial.events),
                     retained_events=len(derived.events), labelled_bins=int(labels.ne(-2).sum()))
         return bins.numpy(), labels.numpy(), ends, meta
@@ -51,9 +54,17 @@ def generate(trial, variant, rng, method, bin_us=100_000):
     x, y = events[:, :2].T
     inside = (x >= 0) & (x < 128) & (y >= 0) & (y < 128)
     keep = inside & (rng.random(len(events)) >= drop)
+    phase_labels = trial.labels
+    if PRESSURE_INTERVALS in phase_labels:
+        phase_labels = {**phase_labels, PRESSURE_INTERVALS: [
+            [name, int(warp(start)), int(warp(end))]
+            for name, start, end in phase_labels[PRESSURE_INTERVALS]
+        ]}
     derived = replace(trial, events=events[keep], start_us=int(warp(trial.start_us)),
-                      end_us=int(warp(trial.end_us)))
+                      end_us=int(warp(trial.end_us)), labels=phase_labels)
     bins, labels, ends = recording_bins(derived, bounds=(origin, int(warp(last))), bin_us=bin_us)
+    if PRESSURE_INTERVALS in derived.labels:
+        labels = pressure_targets(derived, ends, bin_us)
     meta = dict(dx=dx, dy=dy, time_scale=scale, event_drop_probability=drop,
                 source_events=len(events), retained_events=int(keep.sum()),
                 labelled_bins=int(labels.ne(-2).sum()))
@@ -102,14 +113,20 @@ def main():
     parser.add_argument("--seed", default=20261106, type=int)
     parser.add_argument("--method", choices=("mixed", "phase"), default="mixed")
     parser.add_argument("--unified", action="store_true")
-    parser.add_argument("--bin-ms", type=int, choices=(50,100), default=100)
+    parser.add_argument("--bin-ms", type=int, choices=(10,50,100), default=100)
+    parser.add_argument("--pressure-labels", type=Path, help="Reviewed device-time pressure phase intervals")
     args = parser.parse_args()
-    trials = [t for t in read_trials(args.data) if t.labels["task"] in ("slide", "background", "static_contact")]
-    if args.unified:
+    if args.pressure_labels:
+        from .train_gelneuro_temporal import IGNORE
+        trials = pressure_trials(args.data, args.pressure_labels)
+    elif args.unified:
         from .train_gelneuro_unified import prepare, task_of, IGNORE
         trials, _ = prepare(args.data, args.bin_ms * 1000)
+    else:
+        trials = [t for t in read_trials(args.data) if t.labels["task"] in ("slide", "background", "static_contact")]
+    unified = args.unified or args.pressure_labels is not None
     args.out.mkdir(parents=True, exist_ok=False)
-    manifest = dict(source=str(Path(args.data).resolve()), seed=args.seed, bin_us=args.bin_ms * 1000, unified=args.unified,
+    manifest = dict(source=str(Path(args.data).resolve()), seed=args.seed, bin_us=args.bin_ms * 1000, unified=unified,
                     method=args.method, recordings={})
     skipped = []
     for index, trial in enumerate(trials):
@@ -125,7 +142,9 @@ def main():
                 continue
             name = f"{trial.name}-aug{variant}.npz"
             arrays = dict(bins=bins, labels=labels, ends=ends)
-            if args.unified:
+            if args.pressure_labels:
+                arrays["directions"] = np.full_like(labels, IGNORE)
+            elif args.unified:
                 valid = labels != IGNORE
                 arrays["directions"] = labels if task_of(trial) == 1 else np.full_like(labels, IGNORE)
                 arrays["labels"] = np.where(valid, task_of(trial), IGNORE)

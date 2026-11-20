@@ -11,6 +11,22 @@ class UnifiedSNNTests(unittest.TestCase):
         torch.manual_seed(31)
         torch.set_num_threads(2)
 
+    def test_pressure_checkpoint_returns_only_three_task_logits(self):
+        weights = GelNeuroUnifiedSNN(10_000)
+        checkpoint = {
+            "model": weights.state_dict(),
+            "bin_us": 10_000,
+            "kind": "unified-iaf-pressure",
+            "classes": ("quiet", "press", "release"),
+        }
+        pressure = GelNeuroUnifiedSNN.from_checkpoint(checkpoint)
+        counts = torch.ones(1, 3, 2, 32, 32)
+        with torch.inference_mode():
+            expected, _, _ = weights(counts)
+            task, direction, _ = pressure(counts)
+        torch.testing.assert_close(task, expected[..., :3])
+        self.assertEqual(direction.shape, (1, 3, 0))
+
     def test_iaf_bptt_matches_reference(self):
         for alpha in (0.,.5,1.):
             a=torch.randn(2,9,3,2,2,requires_grad=True)

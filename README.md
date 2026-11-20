@@ -1,26 +1,22 @@
-> 最新夹爪实机（2026-11-12）：修正使能后目标刷新与 USB 延迟后，三次保持、八次小行程往返及正式驱动接口验证通过。当次复测结束已关闭使能；电流上限沿用设备值。详见[本次复测](docs/gripper-retest-20261112.md)。
-
-手动开合入口：`./scripts/gripper.sh status`、`./scripts/gripper.sh close --steps 12 --hold-seconds 2`、`./scripts/gripper.sh open --steps 12`。操作和实测说明见[夹爪手动控制](docs/gripper-manual-control.md)。
-
 # NeuroFusion
 
-Speck 片上骨干部署入口：`bash scripts/speck-deploy.sh --help`。导出、部署、恢复和事件速率说明见 [部署文档](docs/speck-on-chip.md)。
+本机代码目录：`/home/diaohh/neurofusion/neurofusion`。融合模型、训练和通用硬件接口放在共享模块，独立任务 demo 放在 `demos/<任务名>/`。
 
-使用片上模型的重抓取入口（实际运动）：`bash scripts/slip-catch-chip.sh`。操作和频率实测见 [片上重抓取说明](docs/slip-catch-chip.md)。
-
-重抓取调参直接编辑 `configs/slip-catch-search.local.json`：使用编码计数、秒和百分比；当前最多松40计数，超时和会话范围自动推导。[配置字段说明](docs/slip-catch-chip.md#直接使用计数和秒调参)。
-
-本机代码目录：`/home/diaohh/neurofusion/neurofusion`。已实现可训练主机链、双触觉采集与独立夹爪SNN闭环；完整多模态策略的实机任务训练和验收仍待完成。
-
-当前独立夹爪一行启动（会实际运动）：
+| 入口 | 用途 |
+| --- | --- |
+| [slip-recatch](demos/slip-recatch/README.md) | 触觉滑动检测与夹爪重抓取，默认使用 Speck 片上骨干 |
+| [balloon-grip](demos/balloon-grip/README.md) | 双触觉气球夹持，跟随悬挂砝码的下拉与回弹 |
+| [Speck 工具](tools/speck/README.md) | 通用片上导出、部署与恢复 |
+| [手动夹爪](docs/gripper-manual-control.md) | `bash scripts/gripper.sh`，手动位置/电流与状态查询 |
 
 ```bash
-bash /home/diaohh/neurofusion/neurofusion/scripts/slip-catch.sh
+# 实际运行滑动重抓取
+bash demos/slip-recatch/run.sh
+# 只检查参数与命令，不连接设备
+bash demos/slip-recatch/run.sh --dry-run
 ```
 
-默认100 Hz控制、1 ms推理窗口，本机只读实测分类发布约99.47 Hz。`--dry-run`检查命令，`--shadow`读取设备但不发送运动目标。换机环境、配置模板、代码结构和验证范围见[开发说明 v1](docs/development.md)，控制流程见[滑移控制说明](docs/slip-teacher.md)。
-
-2026-11-13：已加入独立滑动概率门限、可配置连续窗口确认与锁存、direct运动profile和手动最大速度/加速度设置。当前纸盒参数归档于 `configs/slip-catch-paperbox.example.json`（327→315、6秒、0.5秒间隔、60%单窗触发）；脚本实际读取被忽略的 `slip-catch-search.local.json`。已有真实动作和滑动分类触发回夹日志，物体保持成功率及Ctrl+C退出确认问题仍待验证，见[开发说明](docs/development.md)。
+该 demo 的配置、文档、模型导出和日志都在 `demos/slip-recatch/`；运行代码在 `src/neurofusion/demos/slip_recatch/`。后续任务各建一个同级目录，不再往顶层 `configs/` 和 `outputs/` 混放任务文件。演示目录约定见 [demos](demos/README.md)。
 
 核心设计：RGB 编码后缓存任务上下文 `c`；GelSight 新帧、GelNeuro 事件包、机器人状态及已执行动作，通过确定顺序更新同一份接触记忆 `h`；控制时刻独立读取最新状态，经统一动作头生成动作提案。
 
@@ -100,10 +96,3 @@ GelNeuro/Speck与GelSight真实输入已同时接入正式编码器、记忆和�
 ## 2026-11-11 SNN主链
 
 训练入口默认使用`configs/pipeline-snn.toml`，已接入归档的训练后SNN与跨包膜电位/历史迹，输出64维特征进入融合和动作头。先冻结SNN与视觉骨干，训练投影、融合和动作头；CNN保留作对照。52项测试、12种组合、三步合成训练和真实双触觉离线前向通过。详情、复现命令及真实训练缺口见[本轮验证](docs/snn-flow-validation.md)。旧live_check仍是CNN联调入口，不把离线通过视为SNN已在线/上芯片或机器人闭环完成。
-
-
-## 2026-11-11：SNN 计时滑移教师（历史记录）
-
-2026-11-12已加入实时发布、默认即时回夹与100 Hz启动脚本，当前行为以[开发说明](docs/development.md)为准。以下描述首版实现。
-
-新增独立一维尺子滑移控制器：夹持、有限松开、SNN方向确认、默认0.5秒墙钟计时、夹紧及教师日志。代码`src/neurofusion/control/`；[使用与数据边界](docs/slip-teacher.md)，配置`configs/slip-teacher.example.json`。保持现有机械臂/ROBOTIS接口不变，本控制器未启动实机；2026-11-12上游驱动已通过空载小行程复测并清除旧故障锁，见[复测记录](docs/gripper-retest-20261112.md)。新增16项控制测试在拉取后的驱动上通过，当前SNN checkpoint离线加载通过。原始采集程序的实时窗口/预测发布仍需接线，未宣称整机闭环完成。

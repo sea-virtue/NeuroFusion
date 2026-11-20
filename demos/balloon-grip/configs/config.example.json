@@ -1,0 +1,22 @@
+{
+  "max_open_counts": 25,
+  "max_close_counts": 15,
+  "open_step_counts": 2,
+  "close_step_counts": 1,
+  "tracking_limit_counts": 4,
+  "current_cap_a": 0.20,
+  "min_command_interval_s": 0.035,
+  "lookahead_s": 0.060,
+  "max_projection_delta": 0.20,
+  "startup_s": 2.0,
+  "min_startup_score": 1.2,
+  "deadband_fraction": 0.12,
+  "loss_fraction": 0.20,
+  "max_sensor_age_s": 0.25,
+  "motion_window_s": 0.120,
+  "gelneuro_min_sites": 3,
+  "network_gain_counts": 16.0,
+  "network_deadband_fraction": 0.045,
+  "network_hysteresis_counts": 0.75,
+  "network_max_offset_counts": 4
+}

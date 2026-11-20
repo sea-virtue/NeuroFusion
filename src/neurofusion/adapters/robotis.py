@@ -459,6 +459,8 @@ class RobotisGripper:
                 if self._read(t.profile_acceleration,4) != acceleration:
                     raise RuntimeError('Position profile acceleration readback mismatch before enabling torque')
             self._write_position_profile(preload,current,velocity)
+            if self._read(t.goal_current,2,True) != current:
+                raise RuntimeError('Goal Current readback mismatch before enabling torque')
             if direct and self._read(t.profile_velocity,4) != 0:
                 raise RuntimeError('Could not confirm direct Profile Velocity=0 before enabling torque')
             if not direct and self.config.use_max_velocity and self._read(t.profile_velocity,4) != velocity:
@@ -539,8 +541,13 @@ class RobotisGripper:
             raise RuntimeError('Measured position exceeds operator tightening boundary')
         if not sample.torque_enabled or abs(sample.position_raw-self._origin) > self.config.session_radius_raw+3:
             raise RuntimeError('Torque loss or movement outside session range')
-        if abs(sample.current_a) > self.config.current_cap_a+.03:
-            raise RuntimeError('Measured current exceeds commissioning cap')
+        trip_a = self.config.current_cap_a + .03
+        if abs(sample.current_a) > trip_a:
+            raise RuntimeError(
+                f'Measured current exceeds commissioning cap: {sample.current_a:+.4f} A '
+                f'(trip at ±{trip_a:.4f} A, Goal Current {sample.goal_current_a:.4f} A, '
+                f'position {sample.position_raw} raw)'
+            )
 
     def hold_current(self, current_a, seconds, on_sample=None):
         """Bounded Mode 0 trial: one target, monitored feedback, torque-off at end.
@@ -569,8 +576,10 @@ class RobotisGripper:
         finally:
             self.disarm()
 
-    def wait(self, receipt, on_sample=None):
+    def wait(self, receipt, on_sample=None, *, poll_s=.05):
         self._require_mode('position')
+        if not math.isfinite(poll_s) or poll_s <= 0:
+            raise ValueError('Position feedback poll interval must be finite and positive')
         if not isinstance(receipt,GripperReceipt):
             raise TypeError('Position arrival requires a position receipt, not a current ACK')
         deadline = time.monotonic()+self.config.timeout_s
@@ -585,7 +594,7 @@ class RobotisGripper:
                 consecutive = consecutive+1 if abs(sample.position_raw-receipt.target_raw) <= self.config.tolerance_raw else 0
                 if consecutive >= 3:
                     return sample
-                time.sleep(.05)
+                time.sleep(poll_s)
             raise TimeoutError('No measured arrival before timeout; torque will be disabled')
         except BaseException:
             self.disarm()
